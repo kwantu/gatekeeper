@@ -1,0 +1,34 @@
+{
+  "name": "gatekeeper",
+  "version": "0.1.0",
+  "description": "The Gatekeeper facilitates the creation and updating of all indicator set data",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "build-js": "browserify index.js --standalone GK > dist/gatekeeper.js -d",
+    "build-js-min": "browserify -g uglifyify index.js --standalone GK > dist/gatekeeper.min.js -d",
+    "test": "make test",
+    "test-client": "mocha-phantomjs test/client/runner.html"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kwantu/gatekeeper.git"
+  },
+  "keywords": [
+    "kwantu",
+    "gatekeeper"
+  ],
+  "author": "Brent Gordon <brentgordon01@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kwantu/gatekeeper/issues"
+  },
+  "homepage": "https://github.com/kwantu/gatekeeper#readme",
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "chai-as-promised": "^5.3.0",
+    "mocha": "^2.5.3"
+  }
+}

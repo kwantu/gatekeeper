@@ -1,0 +1,26 @@
+{
+  "name": "gatekeeper",
+  "description": "The Gatekeeper facilitates the creation and updating of all indicator set data",
+  "main": "index.js",
+  "authors": [
+    "Brent Gordon <brentgordon01@gmail.com>"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "kwantu",
+    "gatekeeper"
+  ],
+  "homepage": "https://github.com/kwantu/gatekeeper",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "chai-as-promised": "^5.3.0",
+    "mocha": "^2.5.3"
+  }
+}
