@@ -1,6 +1,3 @@
-# gatekeeper
-Our Kwantu gatekeeper facilitates the creation and updating of all indicator set data
-
 # Gatekeeper [![Build Status](https://travis-ci.org/kwantu/gatekeeper.svg?branch=develop)](https://travis-ci.org/kwantu/gatekeeper)
 > The Gatekeeper facilitates the creation and updating of all indicator set data
 
