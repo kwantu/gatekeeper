@@ -4,9 +4,9 @@ language: node_js
 node_js:
   - "6"
 before_script:
-  - npm install -g bower browserify uglifyify mocha-phantomjs 
+  - npm install -g bower browserify uglifyify mocha-phantomjs
   - bower install
-  - npm run build-js && npm run build-js-min
+  - npm run browserify
 script:
   - npm test
   - npm run test-client
