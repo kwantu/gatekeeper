@@ -7,11 +7,10 @@
     "test": "test"
   },
   "scripts": {
-    "build-js": "browserify index.js --standalone GK > dist/gatekeeper.js -d",
-    "build-js-min": "browserify -g uglifyify index.js --standalone GK > dist/gatekeeper.min.js -d",
-    "update-docs": "jsdoc2md 'index.js' > docs/API.md",
-    "test": "make test",
-    "test-client": "mocha-phantomjs test/client/runner.html"
+    "browserify": "browserify -g uglifyify index.js --standalone GK > dist/gatekeeper.min.js -d",
+    "docs": "jsdoc2md 'index.js' > docs/index.md",
+    "test": "make test && mocha-phantomjs test/client/runner.html",
+    "build": "npm run browserify && npm run docs && npm test"
   },
   "repository": {
     "type": "git",
