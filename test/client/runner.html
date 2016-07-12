@@ -6,14 +6,24 @@
     <body>
         <div id="mocha"></div>
         <!-- Test framework libraries. -->
+        <script src="../../bower_components/jquery-1.11.1/dist/jquery.min.js"></script>
         <script src="../../bower_components/mocha/mocha.js"></script>
         <script src="../../bower_components/chai/chai.js"></script>
         <script src="../../bower_components/chai-as-promised/lib/chai-as-promised.js"></script>
         <!-- Required dependancies / polyfills. -->
         <script src="../../bower_components/moment/min/moment.min.js"></script>
         <script src="../../bower_components/es6-promise/es6-promise.min.js"></script>
+       
         <!-- Browserified workflow.min.js file. -->
+        <script src="../../lib/config.js"></script>
+        <script src="../../lib/betterdata.dao.js"></script>
+        
+        <script src="../../lib/service.js"></script>
+        <script src="../../lib/library.js"></script>
+        
         <script src="../../dist/gatekeeper.min.js"></script>
+
+
         <!-- Mocha test setup. -->
         <script>
             mocha.setup('bdd');

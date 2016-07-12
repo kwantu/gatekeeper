@@ -1,5 +1,10 @@
 'use strict';
 
+require('./lib/config');
+require('./lib/library');
+require('./lib/betterdata.dao');
+
+
 /** 
  * Represents the gatekeeper module.
  * This module will hold all functions to access gatekeeper vi GK() object
@@ -16,8 +21,8 @@
  *
  */
 function GK(){
-	//
-	var _this = this;
+    //
+    var _this = this;
 }
 
 var getResponse = function(status, name, message, error, model,approvedModel, rejectedModel){
@@ -27,9 +32,7 @@ var getResponse = function(status, name, message, error, model,approvedModel, re
                             name: name,
                             message: message,
                             error: error,
-                            model: model,
-                            approvedModel:approvedModel,
-                            rejectedModel:rejectedModel
+                            model: model
                     }
         return  response
     
@@ -43,7 +46,7 @@ var getResponse = function(status, name, message, error, model,approvedModel, re
  * @param {string} documentId - document id which needs to be initialised
  * @param {string} instanceType - valued can be (newInstance/newSequence)
  * @param {string} setId - setId
- * @param {string} profileId - profileId
+ * @param {number} profileId - profileId
  * @param {string} validDate - validDate
  
  * @author Hasan Abbas
@@ -53,7 +56,7 @@ var getResponse = function(status, name, message, error, model,approvedModel, re
  * var gatekeeper = new GK();
  * gatekeeer.instantiate('abc161','newSequence','developerDetail',22,'22/04/2016');
  *
- * @return {Object} Promise Object with respose Object
+ * @return {Array} Array containing document ,approved and rejected objects.
  *
  */
 
@@ -67,30 +70,35 @@ GK.prototype.instantiate = function(documentId, instanceType, setId, profileId, 
         dao.get(documentId).done(
             function(data){ 
                 
-                var response = getResponse(CONFLICT_CODE, CONFLICT_NAME,'Document with same id already exists',true,null,null,null )
-                    
-                def.reject(response);
+                var response = getResponse(CONFLICT_CODE, CONFLICT_NAME,'Document with same id already exists',true,null);
+                
+                var responseArray = [response];
+                
+                def.reject(responseArray);
 
             }).fail(function(err){
 
                 library.saveEntries(setId, profileId, documentId, validDate).done(function(data){
 
-
                     // Taken from old serviceImpl : TODO: review
-
                     if(setId == PROFILE_SET_ID)
                     {
-                        service.createProfileDocuments(LOCAL_SETTINGS.COMMUNITY_CONFIG.communityId, documentId);
+                        service.createProfileDocuments(LOCAL_SETTINGS.COMMUNITY_communityId, documentId);
                     }
                     else{
                         service.addToLocalRegistry({"uuid":documentId,"setId":setId,"applicationId":app.SCOPE.applicationId, "profileId":app.SCOPE.profileId}); 
                     }
-
+                   
                     def.resolve(data);
 
                 }).fail(function(err){
 
-                    def.reject(err);
+                    var response = getResponse(err.status, err.name, err.message, true, err);
+                
+                    var responseArray = [response];
+                    
+                    def.reject(responseArray);
+
                     
                 });
 
@@ -104,41 +112,45 @@ GK.prototype.instantiate = function(documentId, instanceType, setId, profileId, 
                if(data.model.pending.status == ENTRY_STATUS_AUTHORISED || data.model.pending.status == ENTRY_STATUS_REJECTED) {
 
                     var saveNewSeq = function(newSeq){
+                        console.log('newSeq=='+newSeq);
                        data.model.pending.seq = newSeq;
                        data.model.pending.data = {};
                        data.model.pending.status = ENTRY_STATUS_INITIALISED;
                        data.model.pending.validDate = validDate;
                        data.model.pending.revision = '';
                        var user= {"name": LOCAL_SETTINGS.SESSION.firstName + " " + LOCAL_SETTINGS.SESSION.lastName,"userId": LOCAL_SETTINGS.SUBSCRIPTIONS.userId, "username": LOCAL_SETTINGS.SUBSCRIPTIONS.username};
-                      
                        data.model.pending.user = user;
-                       dao.save(data).done(
-                            function(s){
-                               // console.log(data);
-                                def.resolve(data);
-                            }
-                        ).fail(function(err){
-                            def.reject(err);
-                        });
+                    
 
                     };
                     
                     var approve_doc_id = documentId+':approved'
-                    dao.get(approve_doc_id).done(function(data){
-                        var seq = JSON.xpath("max(//approved/seq)",ko.toJS(data),{})[0];
+                    dao.get(approve_doc_id).done(function(approvedData){
+                        var seq = JSON.xpath("max(//approved/seq)",ko.toJS(approvedData),{})[0];
                         var new_seq = seq + 1;
                         saveNewSeq(new_seq);
 
+                        var mainRes = getResponse(CREATED_CODE, CREATED_NAME, 'Sequence created', false, data);
+                        var responseArray = [mainRes];
+                        def.resolve(responseArray);
+
                     }).fail(function(err){
                        
-                        def.reject(err);
+                        
+                        var mainRes = getResponse(err.status, err.name, 'Approved doc not found to create a new sequence', true, null);
+                        
+                        var responseArray = [mainRes];
+                        
+                        def.reject(responseArray);
+
                     });
 
                } else {
 
                     var response = getResponse(SERVER_ERROR_CODE, SERVER_ERROR_NAME,
-                            'Cannot create sequence.Current status should be'+ ENTRY_STATUS_AUTHORISED + 'or '+ ENTRY_STATUS_REJECTED, true, null, null, null );
-                    def.resolve(response);
+                            'Cannot create sequence. Current status should be '+ ENTRY_STATUS_AUTHORISED + ' or '+ ENTRY_STATUS_REJECTED, true, null );
+                    var responseArray = [response];
+                    def.reject(responseArray);
                }
 
             }).fail(function(err){
@@ -146,14 +158,18 @@ GK.prototype.instantiate = function(documentId, instanceType, setId, profileId, 
                 library.saveEntries(setId, profileId, documentId, validDate).done(function(data){
                     def.resolve(data);
                 }).fail(function(err){
-                    var response = getResponse(err.status, err.name,
-                        err.message, true, null, null, null); 
-                    def.resolve(response);
+                    var response = getResponse(err.status, err.name, err.message, true, null); 
+                    var responseArray = [response];
+                    def.reject(responseArray);
                 });
             });
     } else {
 
-        console.log('instance type not found');            
+        
+        var response = getResponse(SERVER_ERROR_CODE, SERVER_ERROR_NAME, 'Instance parameter not passed', true, null); 
+        var responseArray = [response];
+        def.reject(responseArray);
+
     
     }
 
@@ -178,7 +194,7 @@ GK.prototype.instantiate = function(documentId, instanceType, setId, profileId, 
  * var gatekeeper = new GK();
  * gatekeeer.instantiateData('abc161','newSequence','fromAuthorised',viewModel,1)
  *
- * @return {Object} Promise Object with respose Object
+ * @return {Array} Array containing document object.
  *
  */
 GK.prototype.instantiateData = function(documentId, instantiateFrom, indicatorModel, seqNo){
@@ -190,30 +206,17 @@ GK.prototype.instantiateData = function(documentId, instantiateFrom, indicatorMo
     var self = this;
     var def = new $.Deferred();
 
-    var getResponse = function(status, name, message, error, model,approvedModel, rejectedModel){
+    var getResponse = function(status, name, message, error, model){
 
         var response = {
                             status: status,
                             name: name,
                             message: message,
                             error: error,
-                            model: model,
-                            approvedModel:approvedModel,
-                            rejectedModel:rejectedModel
+                            model: model
                     }
         return  response
     }
-
-    var savePacket = function(data){
-                        dao.save(data).done(
-                            function(s){
-                             
-                                def.resolve(s);
-                            }
-                        ).fail(function(err){
-                            def.reject(err);
-                        });
-                    };
 
     dao.get(documentId).done(
             function(data){
@@ -235,17 +238,17 @@ GK.prototype.instantiateData = function(documentId, instantiateFrom, indicatorMo
                                         return value;
                                     } 
                                 }));
+                                
                                 data.model.pending.status = ENTRY_STATUS_DATA_INITIALISED;
-                                savePacket(data);
-                                var response = getResponse(UPDATED_CODE, UPDATED_NAME,
-                                   'Document initialised', false, data, null, null )
-                                def.resolve(response);
-
-                               
+                                var response = getResponse(UPDATED_CODE, UPDATED_NAME, 'Document initialised.', false, data);
+                                var responseArray = [response];
+                                def.resolve(responseArray);
 
                             }).fail(function(err){
 
-                                def.reject(err);
+                                var response = getResponse(err.status, err.name, 'Cannot find document '+documentId, true, null); 
+                                var responseArray = [response];
+                                def.reject(responseArray);
 
                             });
 
@@ -261,17 +264,27 @@ GK.prototype.instantiateData = function(documentId, instantiateFrom, indicatorMo
                                     var definitionModel = eval('setModel.model.pending.data.'+setId);
                                     data.model.pending.data[setId] = definitionModel;
                                     data.model.pending.status = ENTRY_STATUS_DATA_INITIALISED;
-                                    savePacket(data);
-                                    var response = getResponse(UPDATED_CODE, UPDATED_NAME,
-                                        'Document initialised', false, data, null, null )
-                                    def.resolve(response);
+                                    
+                                    var response = getResponse(UPDATED_CODE, UPDATED_NAME, 'Document initialised.', false, data);
+                                    var responseArray = [response];
+                                    def.resolve(responseArray);
 
-                                }).fail();
+                                   
+
+                                }).fail(function(err){
+
+                                    var response = getResponse(err.status, err.name, 'Cannot find default model '+setModelId, true, null); 
+                                    var responseArray = [response];
+                                    def.reject(responseArray);
+
+                                });
 
                                 
                             }).fail(function(err){
 
-                                def.reject(err);
+                                var response = getResponse(err.status, err.name, 'Cannot find document '+documentId, true, null); 
+                                var responseArray = [response];
+                                def.reject(responseArray);
 
                             });
 
@@ -285,24 +298,29 @@ GK.prototype.instantiateData = function(documentId, instantiateFrom, indicatorMo
                                 dao.get(approvedModelId).done(function(approvedModel){
                                     var max_seq =  JSON.xpath('max(/model/approved/seq)',approvedModel,{})[0];
                                     var lastApprovedModel = JSON.xpath('/model/approved[./seq = '+ max_seq +']',approvedModel,{})[0]    ;
-                                    
                                    
-
-                               
                                     var newModel =  eval('lastApprovedModel.data.'+setId);
                                     data.model.pending.data[setId] = newModel;
                                     data.model.pending.status = ENTRY_STATUS_DATA_INITIALISED;
-                                    savePacket(data);
-                                    var response = getResponse(UPDATED_CODE, UPDATED_NAME,
-                                        'Document initialised', false, data, null, null )
-                                    def.resolve(response);
+                                    
+                                    var response = getResponse(UPDATED_CODE, UPDATED_NAME, 'Document initialised.', false, data);
+                                    var responseArray = [response];
+                                    def.resolve(responseArray);
 
-                                }).fail();
+                                }).fail(function(err){
+
+                                    var response = getResponse(err.status, err.name, 'Cannot find approved model '+approvedModelId, true, null); 
+                                    var responseArray = [response];
+                                    def.reject(responseArray);
+
+                                });
 
                                 
                             }).fail(function(err){
 
-                                def.reject(err);
+                                var response = getResponse(err.status, err.name, 'Cannot find document '+documentId, true, null); 
+                                var responseArray = [response];
+                                def.reject(responseArray);
 
                             });
 
@@ -312,23 +330,31 @@ GK.prototype.instantiateData = function(documentId, instantiateFrom, indicatorMo
                     } else {
 
                         var response = getResponse(SERVER_ERROR_CODE, SERVER_ERROR_NAME,
-                            'Input sequence should be equal to pending sequence.', true, null, null, null );
-                        def.resolve(response);
+                            'Input sequence should be equal to pending sequence.', true, null );                         
+                        var responseArray = [response];
+                        def.reject(responseArray);
+
+
 
                     }
                     
                 } else {
 
                         var response = getResponse(SERVER_ERROR_CODE, SERVER_ERROR_NAME,
-                            'Status is not in '+ ENTRY_STATUS_INITIALISED+ ' state.', true, null, null, null );
-                        def.resolve(response);
+                            'Status is not in '+ ENTRY_STATUS_INITIALISED+ ' state.', true, null );
+                        var responseArray = [response];
+                        def.reject(responseArray);
+
+
+
 
                 }
 
             }).fail(function(err){
 
-                var response = getResponse(err.status, err.name, err.message, true, null, null, null); 
-                def.resolve(response);
+                var response = getResponse(err.status, err.name, err.message, true, null); 
+                var responseArray = [response];
+                def.reject(responseArray);
 
             });
 
@@ -355,7 +381,7 @@ GK.prototype.instantiateData = function(documentId, instantiateFrom, indicatorMo
  * var gatekeeper = new GK();
  * gatekeeer.update('abc161',viewModel)
  *
- * @return {Object} Promise Object with respose Object
+  * @return {Array} Array containing document object.
  *
  */
 
@@ -365,7 +391,7 @@ GK.prototype.update = function(documentId,indicatorModel){
     var def = new $.Deferred();
 
     var processAllRules = 
-        function(index, documentId, indicatorModel, configDoc, ruleResponse, def_processRules){
+        function(index, object, indicatorModel, configDoc, ruleResponse, def_processRules){
 
             var ruleObj = configDoc.rules[index];   
             var executeAt = ruleObj.executeAt;
@@ -394,34 +420,18 @@ GK.prototype.update = function(documentId,indicatorModel){
                                 }
 
                             }
-                            dao.get(documentId).done(function(object){
-                                 
-                                if(source.substring(0, 4) == 'doc:'){
-                                    eval('object.'+ source.substring(source.length, 4) +'= str;');
-                                } else {
-                                    eval('object.model.pending.data.'+indicatorModel.defaultModel.setId()+'.'+source+'= str;');
-                                }
-                                
-                                dao.save(object).done(function(data){
-                                 
-                                    ruleResponse.ruleStatus = 'RULE_COMPLETE';
-                                    
-                                    if(index == configDoc.rules.length - 1){
-                                      def_processRules.resolve(ruleResponse);
-                                    } else {
-                                        processAllRules(index+1, documentId, indicatorModel, configDoc, ruleResponse,def_processRules);    
-                                    }
-
-                                }).fail(function(err){
-                                  ruleResponse.ruleStatus = 'RULE_ERROR';
-                                });
-
-                            }).fail(function(err){
-
-                                
-
-                            });
-                           
+                            //-------------------
+                            if(source.substring(0, 4) == 'doc:'){
+                                eval('object.'+ source.substring(source.length, 4) +'= str;');
+                            } else {
+                                eval('object.model.pending.data.'+indicatorModel.defaultModel.setId()+'.'+source+'= str;');
+                            }
+                            ruleResponse.ruleStatus = 'RULE_COMPLETE';
+                            if(index == configDoc.rules.length - 1){
+                              def_processRules.resolve(ruleResponse);
+                            } else {
+                                processAllRules(index+1, object, indicatorModel, configDoc, ruleResponse, def_processRules);    
+                            }
                             break;
                         case 'initialise':
                             break;
@@ -432,20 +442,11 @@ GK.prototype.update = function(documentId,indicatorModel){
             } else {
                 //TODO: implement server side post actions   
                 
-                dao.get(documentId).done(function(data){
-                    data.model.pending.processingStatus.seq = seq;
-                    data.model.pending.processingStatus.ruleStatus = PROCESSING_STATUS_SERVER_RULES;
-                    dao.save(data).done(function(object){
-                         
-                         ruleResponse.ruleStatus = 'RULE_SERVER';
-                         def_processRules.resolve(ruleResponse);
+                    object.model.pending.processingStatus.seq = seq;
+                    object.model.pending.processingStatus.ruleStatus = PROCESSING_STATUS_SERVER_RULES;
+                    ruleResponse.ruleStatus = 'RULE_SERVER';
+                    def_processRules.resolve(ruleResponse);
 
-                    }).fail(function(err){
-                         console.log('error function in PROCESSING_STATUS_SERVER_RULES'+ err);
-                    });
-                }).fail(function(){
-                     
-                });
             }
             return def_processRules;
     }
@@ -455,8 +456,10 @@ GK.prototype.update = function(documentId,indicatorModel){
         if(indicatorModel.modelErrors().length > 0){
 
             var response = getResponse(PRECONDITION_FAILED_CODE, PRECONDITION_FAILED_NAME,
-                    'There are '+indicatorModel.modelErrors().length+ ' errors on form. Please resolve first.', true, null, null, null );
-            def.reject(response);
+                    'There are '+indicatorModel.modelErrors().length+ ' errors on form. Please resolve first.', true, null);
+            var responseArray = [response];
+            def.reject(responseArray);
+
 
         } else {
 
@@ -485,7 +488,7 @@ GK.prototype.update = function(documentId,indicatorModel){
                 }
 
                 // Process all attachments
-                var files = JSON.xpath("//*[fileData and isChanged eq 'true']",model,{});
+                /*var files = JSON.xpath("//*[fileData and isChanged eq 'true']",model,{});
                 
                 var attachementsToProcess = [];
                     for(var ol=0;ol<files.length;ol++){
@@ -520,27 +523,11 @@ GK.prototype.update = function(documentId,indicatorModel){
                     }).fail(function (e) {
                         console.log("can not saved attachemnt " + e);
                     });
-                };
+                };*/
 
-                var postSave = function(data){
-                    indicatorModel.defaultModel.atomId(documentId);
-                    if (attachementsToProcess.length > 0) {
-                        saveAttachments(data, 0);
-                    }
-                    var response = getResponse(UPDATED_CODE, UPDATED_NAME,'Document updated', false, data, null, null )
-                    def.resolve(response);
-                };
+               
 
-                var savePacket = function(finalPkt){
-
-                    //validate online here
-                    dao.save(finalPkt).done(postSave).fail(function(err){
-                        app.showMessage("Unable to save changes due to version conflict. Please reload the form to see the recent updates.");
-                        deffered.reject(err);
-                    });
-
-                };
-
+               
                 dao.get(indicatorModel.customModel.setId()+ '_'+version+"_config").done(function(configDoc){
 
                     doc.model.pending.data[indicatorModel.customModel.setId()] = model;
@@ -562,43 +549,44 @@ GK.prototype.update = function(documentId,indicatorModel){
                     // Save the document in the database i.e. local PouchDB or Couchbase Lite
                     doc.source = "remote";
 
-                    if(configDoc.rules.length > 0){
+                    if(configDoc.rules != undefined && configDoc.rules.length > 0){
 
-                        doc.model.pending.status = ENTRY_STATUS_PENDING_RULES;
-                        dao.save(doc).done(function(data){
+                            doc.model.pending.status = ENTRY_STATUS_PENDING_RULES;
+                            //Start rule processing here -------------------------
 
                             var def_processRules = new $.Deferred();
-                            processAllRules(0,documentId, indicatorModel, configDoc,{"ruleStatus":""},def_processRules).done(function(inModel){
-
+                            processAllRules(0, doc, indicatorModel, configDoc,{"ruleStatus":""},def_processRules).done(function(inModel){
+                                
                                 if(inModel.ruleStatus == 'RULE_COMPLETE'){
+                                    
+                                    doc.model.pending.processingStatus.seq = '';
+                                    doc.model.pending.processingStatus.ruleStatus = '';
+                                    doc.model.pending.status = ENTRY_STATUS_UPDATED;
 
-                                    dao.get(documentId).done(function(data){
-                                        data.model.pending.processingStatus.seq = '';
-                                        data.model.pending.processingStatus.ruleStatus = '';
-                                        data.model.pending.status = ENTRY_STATUS_UPDATED;
-
-
-                                        //TODO: Fix ENTRY_STATUS_READY_TO_SUBMIT in document. 
-                                        if(app.processId != undefined)
+                                    //TODO: Fix ENTRY_STATUS_READY_TO_SUBMIT in document. 
+                                    if(app.processId != undefined)
+                                    {
+                                        var process = JSON.xpath("/processes[subProcessId eq '"+app.processId+"']",doc,{});
+                                                                            
+                                        if(process.length > 0)
                                         {
-                                            var process = JSON.xpath("/processes[subProcessId eq '"+app.processId+"']",data,{});
-                                                                                
-                                            if(process.length > 0)
-                                            {
-                                                process[0].status = ENTRY_STATUS_READY_TO_SUBMIT;// check here the index
-                                            }   
-                                        }
-                                        
+                                            process[0].status = ENTRY_STATUS_READY_TO_SUBMIT;// check here the index
+                                        }   
+                                    }
 
-                                        savePacket(data);
-
-                                    }).fail(function(error){
-                                        def.reject('ENTRY_STATUS_UPDATED failed');
-                                    });
+                                    indicatorModel.defaultModel.atomId(documentId);
+                                    var response = getResponse(UPDATED_CODE, UPDATED_NAME,'Document updated', false, doc);
+                                    var responseArray = [response];
+                                    def.resolve(responseArray);
 
                                 } else if(inModel.ruleStatus == 'RULE_SERVER'){
                                     
                                     console.log('dependent onserver rule');
+
+                                    var response = getResponse(UPDATED_CODE, UPDATED_NAME,'dependent onserver rule', false, doc);
+                                    var responseArray = [response];
+                                    def.resolve(responseArray);
+
 
                                 } else if(inModel.ruleStatus == 'RULE_ERROR'){
                                     
@@ -608,31 +596,26 @@ GK.prototype.update = function(documentId,indicatorModel){
 
                             }).fail(function(error){
                                   def.reject('processAllRules fail promise case failed');
+
+
                             });
-
-                        }).fail(function(error){
-                            def.reject('ENTRY_STATUS_PENDING_RULES failed');
-                        });
-
-                    
                         
                     } else {
 
-                        dao.get(documentId).done(function(data){
-                         
-                            data.model.pending.status = ENTRY_STATUS_UPDATED;
-                            savePacket(data);
+                        doc.model.pending.status = ENTRY_STATUS_UPDATED;
+                        indicatorModel.defaultModel.atomId(documentId);
+                        var response = getResponse(UPDATED_CODE, UPDATED_NAME,'Document updated', false, doc);
+                        var responseArray = [response];
+                        def.resolve(responseArray);
 
-                        }).fail(function(error){
-                            def.reject('ENTRY_STATUS_UPDATED failed');
-                        });
 
                     }
 
                 }).fail(function(err){
 
-                    var response = getResponse(err.status, err.name, err.message, true, null, null, null); 
-                    def.reject(response);       
+                    var response = getResponse(err.status, err.name, 'config file not found.', true, null); 
+                    var responseArray = [response];
+                    def.reject(responseArray);
 
                 });
                    
@@ -642,16 +625,23 @@ GK.prototype.update = function(documentId,indicatorModel){
             } else {
 
                 var response = getResponse(SERVER_ERROR_CODE, SERVER_ERROR_NAME,
-                            'Status is not in '+ ENTRY_STATUS_DATA_INITIALISED +' or '+ ENTRY_STATUS_UPDATED + ' state.', true, null, null, null );
-                def.resolve(response);
+                            'Status is not in '+ ENTRY_STATUS_DATA_INITIALISED +' or '+ ENTRY_STATUS_UPDATED + ' state.', true, null );
+             
+                var responseArray = [response];
+                def.reject(responseArray);
+
+
 
             }
         }
 
     }).fail(function(err){
 
-            var response = getResponse(err.status, err.name, err.message, true, null, null, null); 
-            def.reject(response);
+            var response = getResponse(err.status, err.name, err.message, true, null); 
+            var responseArray = [response];
+            def.reject(responseArray);
+
+
     });
 
     return def;
@@ -671,7 +661,7 @@ GK.prototype.update = function(documentId,indicatorModel){
  * var gatekeeper = new GK();
  * gatekeeer.authorise('abc161')
  *
- * @return {Object} Promise Object with respose Object
+  * @return {Array} Array containing document and authorise object.
  *
  */
 
@@ -685,33 +675,29 @@ GK.prototype.authorise = function(documentId){
 
             if(data.model.pending.status == ENTRY_STATUS_UPDATED){
 
-                var saveDoc = function(doc){
-                       dao.save(doc).done(
-                            function(s){
-                              
-                              
-                            }
-                        ).fail(function(err){
-                            def.reject(err);
-                        });
-                };
+               
 
 
                 var setId = data.category.term;
                 var path = data.model.pending;
                 var item = eval(path);
                 data.model.pending.status = ENTRY_STATUS_AUTHORISED;
-                saveDoc(data);
+                
 
                 var approve_doc_id = documentId+':approved';
 
                 dao.get(approve_doc_id).done(function(approveData){
                     
                     approveData.model.approved.push(item);
-                    saveDoc(approveData);
+                  
 
+                    var mainRes = getResponse(UPDATED_CODE, UPDATED_NAME,'Document Model approved', false, data);
 
-                    def.resolve(approveData);
+                    var approveRes = getResponse(UPDATED_CODE, UPDATED_NAME, 'Approved model incremented', false, approveData);
+
+                    var responseArray = [mainRes, approveRes];
+
+                    def.resolve(responseArray);    
                  
                 }).fail(function(err){
                    
@@ -720,8 +706,12 @@ GK.prototype.authorise = function(documentId){
 
             } else {
 
-                var response = getResponse(BAD_REQUEST_CODE, BAD_REQUEST_NAME,'Status not in updated state',true,null,null,null )
-                def.reject(response);
+             
+
+                var response = getResponse(BAD_REQUEST_CODE, BAD_REQUEST_NAME,'Status not in updated state', true, null); 
+                var responseArray = [response];
+                def.reject(responseArray);
+
 
             }
 
@@ -729,17 +719,18 @@ GK.prototype.authorise = function(documentId){
 
         }).fail(function(err){
 
-           var response = getResponse(err.status, err.name,
-                        err.message, true, null, null, null); 
-            def.resolve(response);
+           var response = getResponse(err.status, err.name, err.message, true, null); 
+           var responseArray = [response];
+           def.reject(responseArray);
+
 
         });
 
     }else{
 
-        var response = getResponse(BAD_REQUEST_CODE, BAD_REQUEST_NAME,'Document ID is blank',true,null,null,null )
-                    
-        def.reject(response);
+        var response = getResponse(BAD_REQUEST_CODE, BAD_REQUEST_NAME,'Document ID is blank', true, null); 
+        var responseArray = [response];
+        def.reject(responseArray);
 
     }
 
@@ -761,7 +752,7 @@ GK.prototype.authorise = function(documentId){
  * var gatekeeper = new GK();
  * gatekeeer.reject('abc161')
  *
- * @return {Object} Promise Object with respose Object
+ * @return {Array} Array containing document and rejected object.
  *
  */
 
@@ -777,33 +768,28 @@ GK.prototype.reject = function(documentId){
 
             if(data.model.pending.status == ENTRY_STATUS_UPDATED){
 
-                var saveDoc = function(doc){
-                       dao.save(doc).done(
-                            function(s){
-                               
-                              
-                            }
-                        ).fail(function(err){
-                            def.reject(err);
-                        });
-                };
+               
 
 
                 var setId = data.category.term;
                 var item = eval('data.model.pending.data'+setId);
 
                 data.model.pending.status = ENTRY_STATUS_REJECTED;
-                saveDoc(data);
+                
 
                 var rejected_doc_id = documentId+':rejected';
 
                 dao.get(rejected_doc_id).done(function(rejectedData){
                     
                     rejectedData.model.rejected.push(item);
-                    saveDoc(rejectedData);
+                   
+                    var mainRes = getResponse(UPDATED_CODE, UPDATED_NAME,'Document Model approved', false, data);
 
+                    var rejRes = getResponse(UPDATED_CODE, UPDATED_NAME, 'Rejetced model incremented', false, rejectedData);
 
-                    def.resolve(rejectedData);
+                    var responseArray = [mainRes, rejRes];
+
+                    def.resolve(responseArray);    
                     
                 }).fail(function(err){
                    
@@ -812,8 +798,12 @@ GK.prototype.reject = function(documentId){
 
             } else {
 
-                var response = getResponse(BAD_REQUEST_CODE, BAD_REQUEST_NAME,'Status not in updated state',true,null,null,null )
-                def.reject(response);
+                var response = getResponse(BAD_REQUEST_CODE, BAD_REQUEST_NAME,'Status not in updated state', true, null); 
+                var responseArray = [response];
+                def.reject(responseArray);
+
+
+
 
             }
 
@@ -821,17 +811,17 @@ GK.prototype.reject = function(documentId){
 
         }).fail(function(err){
 
-           var response = getResponse(err.status, err.name,
-                        err.message, true, null, null, null); 
-            def.resolve(response);
+             var response = getResponse(err.status, err.name, err.message, true, null); 
+           var responseArray = [response];
+           def.reject(responseArray);
 
         });
 
     }else{
 
-        var response = getResponse(BAD_REQUEST_CODE, BAD_REQUEST_NAME,'Document ID is blank',true,null,null,null )
-                    
-        def.reject(response);
+       var response = getResponse(BAD_REQUEST_CODE, BAD_REQUEST_NAME,'Document ID is blank',true,null ) 
+       var responseArray = [response];
+       def.reject(responseArray);
 
     }
 
@@ -856,5 +846,21 @@ GK.prototype.unlock = function(val){
 
     });
 };
+
+GK.prototype.persist = function(modelArray){
+    var self = this;
+    var def = new $.Deferred();
+
+    for (var i=0; i < modelArray.length; i++) {
+              dao.save(modelArray[i].model).done(function(data){
+                console.log(data);
+                def.resolve(data);
+              }).fail(function(err){
+                console.log(err);
+                def.reject(err);
+              });
+        }   
+};
+
 
 module.exports = GK;

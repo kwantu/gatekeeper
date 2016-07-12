@@ -9,17 +9,16 @@ Returns GK() object
 
 * [GK](#GK)
     * [new GK()](#new_GK_new)
-    * [.instantiate(documentId, instanceType, setId, profileId, validDate)](#GK+instantiate) ⇒ <code>Object</code>
-    * [.instantiateData(documentId, instanceType, instantiateFrom, indicatorModel, seqNo)](#GK+instantiateData) ⇒ <code>Object</code>
-    * [.update(documentId, indicatorModel)](#GK+update) ⇒ <code>Object</code>
-    * [.authorise(documentId)](#GK+authorise) ⇒ <code>Object</code>
-    * [.reject(documentId)](#GK+reject) ⇒ <code>Object</code>
+    * [.instantiate(documentId, instanceType, setId, profileId, validDate)](#GK+instantiate) ⇒ <code>Array</code>
+    * [.instantiateData(documentId, instanceType, instantiateFrom, indicatorModel, seqNo)](#GK+instantiateData) ⇒ <code>Array</code>
+    * [.update(documentId, indicatorModel)](#GK+update) ⇒ <code>Array</code>
+    * [.authorise(documentId)](#GK+authorise) ⇒ <code>Array</code>
+    * [.reject(documentId)](#GK+reject) ⇒ <code>Array</code>
 
 <a name="new_GK_new"></a>
 
 ### new GK()
-Represents the gatekeeper module.
-This module will hold all functions to access gatekeeper vi GK() object
+Represents the gatekeeper module.This module will hold all functions to access gatekeeper vi GK() object
 
 **Returns**: <code>Object</code> - new GK constructor / class object  
 **Example**  
@@ -28,13 +27,11 @@ var gatekeeper = new GK();
 ```
 <a name="GK+instantiate"></a>
 
-### gK.instantiate(documentId, instanceType, setId, profileId, validDate) ⇒ <code>Object</code>
-Represents the instantiate function.
-Creates new document in case of newInstance, also creates approved and rejected documents.
-Creates new suence in case of newSequence.
+### gK.instantiate(documentId, instanceType, setId, profileId, validDate) ⇒ <code>Array</code>
+Represents the instantiate function.Creates new document in case of newInstance, also creates approved and rejected documents.Creates new suence in case of newSequence.
 
 **Kind**: instance method of <code>[GK](#GK)</code>  
-**Returns**: <code>Object</code> - Promise Object with respose Object  
+**Returns**: <code>Array</code> - Array containing document ,approved and rejected objects.  
 **Version**: 1.0.0  
 **Author:** Hasan Abbas  
 
@@ -43,21 +40,20 @@ Creates new suence in case of newSequence.
 | documentId | <code>string</code> | document id which needs to be initialised |
 | instanceType | <code>string</code> | valued can be (newInstance/newSequence) |
 | setId | <code>string</code> | setId |
-| profileId | <code>string</code> | profileId |
+| profileId | <code>number</code> | profileId |
 | validDate | <code>string</code> | validDate |
 
 **Example**  
 ```js
-var gatekeeper = new GK();
-gatekeeer.instantiate('abc161','newSequence','developerDetail',22,'22/04/2016');
+var gatekeeper = new GK();gatekeeer.instantiate('abc161','newSequence','developerDetail',22,'22/04/2016');
 ```
 <a name="GK+instantiateData"></a>
 
-### gK.instantiateData(documentId, instanceType, instantiateFrom, indicatorModel, seqNo) ⇒ <code>Object</code>
+### gK.instantiateData(documentId, instanceType, instantiateFrom, indicatorModel, seqNo) ⇒ <code>Array</code>
 Represents the instantiateData function.
 
 **Kind**: instance method of <code>[GK](#GK)</code>  
-**Returns**: <code>Object</code> - Promise Object with respose Object  
+**Returns**: <code>Array</code> - Array containing document object.  
 **Version**: 1.0.0  
 **Author:** Hasan Abbas  
 
@@ -71,19 +67,15 @@ Represents the instantiateData function.
 
 **Example**  
 ```js
-var gatekeeper = new GK();
-gatekeeer.instantiateData('abc161','newSequence','fromAuthorised',viewModel,1)
+var gatekeeper = new GK();gatekeeer.instantiateData('abc161','newSequence','fromAuthorised',viewModel,1)
 ```
 <a name="GK+update"></a>
 
-### gK.update(documentId, indicatorModel) ⇒ <code>Object</code>
-Represents the update function function.
-Updtates the current document pending with input customModel object.
-Process all rules, attachments etc.
-Updated status to UPDATED or PendingRules if there are any server rules
+### gK.update(documentId, indicatorModel) ⇒ <code>Array</code>
+Represents the update function function.Updtates the current document pending with input customModel object.Process all rules, attachments etc.Updated status to UPDATED or PendingRules if there are any server rules
 
 **Kind**: instance method of <code>[GK](#GK)</code>  
-**Returns**: <code>Object</code> - Promise Object with respose Object  
+**Returns**: <code>Array</code> - Array containing document object.  
 **Version**: 1.0.0  
 **Author:** Hasan Abbas  
 
@@ -94,18 +86,15 @@ Updated status to UPDATED or PendingRules if there are any server rules
 
 **Example**  
 ```js
-var gatekeeper = new GK();
-gatekeeer.update('abc161',viewModel)
+var gatekeeper = new GK();gatekeeer.update('abc161',viewModel)
 ```
 <a name="GK+authorise"></a>
 
-### gK.authorise(documentId) ⇒ <code>Object</code>
-Represents the authorise  function.
-Updtates the current document pending with status Authorised.
-Copied the data to authorised array of authorised document.
+### gK.authorise(documentId) ⇒ <code>Array</code>
+Represents the authorise  function.Updtates the current document pending with status Authorised.Copied the data to authorised array of authorised document.
 
 **Kind**: instance method of <code>[GK](#GK)</code>  
-**Returns**: <code>Object</code> - Promise Object with respose Object  
+**Returns**: <code>Array</code> - Array containing document and authorise object.  
 **Version**: 1.0.0  
 **Author:** Hasan Abbas  
 
@@ -115,18 +104,15 @@ Copied the data to authorised array of authorised document.
 
 **Example**  
 ```js
-var gatekeeper = new GK();
-gatekeeer.authorise('abc161')
+var gatekeeper = new GK();gatekeeer.authorise('abc161')
 ```
 <a name="GK+reject"></a>
 
-### gK.reject(documentId) ⇒ <code>Object</code>
-Represents the reject  function.
-Updtates the current document pending with status Rejetced.
-Copied the data to authorised array of rejected document.
+### gK.reject(documentId) ⇒ <code>Array</code>
+Represents the reject  function.Updtates the current document pending with status Rejetced.Copied the data to authorised array of rejected document.
 
 **Kind**: instance method of <code>[GK](#GK)</code>  
-**Returns**: <code>Object</code> - Promise Object with respose Object  
+**Returns**: <code>Array</code> - Array containing document and rejected object.  
 **Version**: 1.0.0  
 **Author:** Hasan Abbas  
 
@@ -136,6 +122,5 @@ Copied the data to authorised array of rejected document.
 
 **Example**  
 ```js
-var gatekeeper = new GK();
-gatekeeer.reject('abc161')
+var gatekeeper = new GK();gatekeeer.reject('abc161')
 ```
