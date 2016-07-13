@@ -81,15 +81,14 @@ GK.prototype.instantiate = function(documentId, instanceType, setId, profileId, 
                 library.saveEntries(setId, profileId, documentId, validDate).done(function(data){
 
                     // Taken from old serviceImpl : TODO: review
+                    
+                    var profileDocuments=[];
+
                     if(setId == PROFILE_SET_ID)
                     {
-                        service.createProfileDocuments(LOCAL_SETTINGS.COMMUNITY_communityId, documentId);
+                        profileDocuments = library.createProfileDocuments(LOCAL_SETTINGS.COMMUNITY_communityId, profileId);
                     }
-                    else{
-                        service.addToLocalRegistry({"uuid":documentId,"setId":setId,"applicationId":app.SCOPE.applicationId, "profileId":app.SCOPE.profileId}); 
-                    }
-                   
-                    def.resolve(data);
+                    def.resolve(data.concat(profileDocuments));
 
                 }).fail(function(err){
 
