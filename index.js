@@ -155,7 +155,7 @@ GK.prototype.instantiate = function(documentId, instanceType, setId, profileId, 
                             reject(responseArray);
                         }
 
-                    }, function(err) {
+                    }).fail(function(err) {
                         //create document relating to new seq
                         library.saveEntries(setId, profileId, documentId, validDate).then(
                             function(data) {
@@ -574,7 +574,7 @@ GK.prototype.update = function(documentId, indicatorModel) {
                                 var def_processRules = new $.Deferred();
                                 processAllRules(0, doc, indicatorModel, configDoc, {
                                     "ruleStatus": ""
-                                }, def_processRules).done(function(inModel) {
+                                }, def_processRules).then(function(inModel) {
 
                                     if (inModel.ruleStatus == 'RULE_COMPLETE') {
 
@@ -611,7 +611,7 @@ GK.prototype.update = function(documentId, indicatorModel) {
 
                                     }
 
-                                }).fail(function(error) {
+                                }).catch(function(error) {
                                     reject('processAllRules fail promise case failed');
 
 
