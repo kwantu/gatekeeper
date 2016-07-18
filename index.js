@@ -224,7 +224,7 @@ GK.prototype.instantiateData = function(documentId, instantiateFrom, indicatorMo
                     error: error,
                     model: model
                 }
-                return response
+                return response;
             }
 
             dao.get(documentId).done(
@@ -403,67 +403,7 @@ GK.prototype.update = function(documentId, indicatorModel) {
     return new Promise(function(resolve, reject) {
         try {
 
-            var processAllRules =
-                function(index, object, indicatorModel, configDoc, ruleResponse, def_processRules) {
-
-                    var ruleObj = configDoc.rules[index];
-                    var executeAt = ruleObj.executeAt;
-                    var id = ruleObj.id;
-                    var seq = ruleObj.seq;
-                    var type = ruleObj.executeRule.ruleType;
-
-                    if (executeAt == 'local') {
-
-                        switch (type) {
-                            case 'update':
-                                var source = ruleObj.executeRule.params.source;
-                                var str = '';
-                                for (var ol = 0; ol < ruleObj.executeRule.params.target.length; ol++) {
-
-                                    var targetItem = ruleObj.executeRule.params.target[ol];
-                                    var targetType = targetItem.type;
-                                    var targetName = targetItem.name;
-                                    if (targetType == 'variable') {
-
-                                        str = str + eval("indicatorModel.customModel." + indicatorModel.defaultModel.setId() + '.' + targetName + '()') + ' ';
-
-                                    } else {
-
-                                        str = str + targetName + ' ';
-                                    }
-
-                                }
-                                //-------------------
-                                if (source.substring(0, 4) == 'doc:') {
-                                    eval('object.' + source.substring(source.length, 4) + '= str;');
-                                } else {
-                                    eval('object.model.pending.data.' + indicatorModel.defaultModel.setId() + '.' + source + '= str;');
-                                }
-                                ruleResponse.ruleStatus = 'RULE_COMPLETE';
-                                if (index == configDoc.rules.length - 1) {
-                                    def_processRules.resolve(ruleResponse);
-                                } else {
-                                    processAllRules(index + 1, object, indicatorModel, configDoc, ruleResponse, def_processRules);
-                                }
-                                break;
-                            case 'initialise':
-                                break;
-                            case 'unique':
-                                break;
-                        }
-
-                    } else {
-                        //TODO: implement server side post actions   
-
-                        object.model.pending.processingStatus.seq = seq;
-                        object.model.pending.processingStatus.ruleStatus = PROCESSING_STATUS_SERVER_RULES;
-                        ruleResponse.ruleStatus = 'RULE_SERVER';
-                        def_processRules.resolve(ruleResponse);
-
-                    }
-                    return def_processRules;
-                }
-
+            
             dao.get(documentId).done(function(doc) {
 
                 if (indicatorModel.modelErrors().length > 0) {
@@ -473,11 +413,9 @@ GK.prototype.update = function(documentId, indicatorModel) {
                     var responseArray = [response];
                     reject(responseArray);
 
-
                 } else {
 
                     if (doc.model.pending.status == ENTRY_STATUS_DATA_INITIALISED || doc.model.pending.status == ENTRY_STATUS_UPDATED) {
-
 
                         var model = JSON.parse(ko.toJSON(eval('indicatorModel.customModel.' + indicatorModel.defaultModel.setId()), function(key, value) {
                             if (key === '__ko_mapping__') {
@@ -535,9 +473,6 @@ GK.prototype.update = function(documentId, indicatorModel) {
                             });
                         };*/
 
-
-
-
                         dao.get(indicatorModel.customModel.setId() + '_' + version + "_config").done(function(configDoc) {
 
                             doc.model.pending.data[indicatorModel.customModel.setId()] = model;
@@ -569,12 +504,13 @@ GK.prototype.update = function(documentId, indicatorModel) {
                             if (configDoc.rules != undefined && configDoc.rules.length > 0) {
 
                                 doc.model.pending.status = ENTRY_STATUS_PENDING_RULES;
-                                //Start rule processing here -------------------------
+                                
 
+                                //Start rule processing here -------------------------
                                 var def_processRules = new $.Deferred();
-                                processAllRules(0, doc, indicatorModel, configDoc, {
+                                processAllRules(0, "update", doc, indicatorModel, configDoc, {
                                     "ruleStatus": ""
-                                }, def_processRules).then(function(inModel) {
+                                }, def_processRules).done(function(inModel) {
 
                                     if (inModel.ruleStatus == 'RULE_COMPLETE') {
 
@@ -590,6 +526,9 @@ GK.prototype.update = function(documentId, indicatorModel) {
                                                 process[0].status = ENTRY_STATUS_READY_TO_SUBMIT; // check here the index
                                             }
                                         }
+                                        
+
+
 
                                         indicatorModel.defaultModel.atomId(documentId);
                                         var response = getResponse(UPDATED_CODE, UPDATED_NAME, 'Document updated', false, doc);
@@ -611,10 +550,8 @@ GK.prototype.update = function(documentId, indicatorModel) {
 
                                     }
 
-                                }).catch(function(error) {
+                                }).fail(function(error) {
                                     reject('processAllRules fail promise case failed');
-
-
                                 });
 
                             } else {
@@ -816,6 +753,77 @@ var processInitialiseRule = function(documentId, ruleObj, indicatorModel) {
 var processUniqueRule = function(documentId, ruleObj, indicatorModel) {
 
 };
+
+var processAllRules =
+    function(index, scope, object, indicatorModel, configDoc, ruleResponse, def_processRules) {
+
+        var ruleObj = configDoc.rules[index];
+        var executeAt = ruleObj.executeAt;
+        var event = ruleObj.event;
+        var id = ruleObj.id;
+        var seq = ruleObj.seq;
+        var type = ruleObj.executeRule.ruleType;
+
+        if(scope == event){
+            if (executeAt == 'local') {
+
+                switch (type) {
+                    case 'update':
+                        var source = ruleObj.executeRule.params.source;
+                        var str = '';
+                        for (var ol = 0; ol < ruleObj.executeRule.params.target.length; ol++) {
+
+                            var targetItem = ruleObj.executeRule.params.target[ol];
+                            var targetType = targetItem.type;
+                            var targetName = targetItem.name;
+                            if (targetType == 'variable') {
+
+                                str = str + eval("indicatorModel.customModel." + indicatorModel.defaultModel.setId() + '.' + targetName + '()') + ' ';
+
+                            } else {
+
+                                str = str + targetName + ' ';
+                            }
+
+                        }
+                        //-------------------
+                        if (source.substring(0, 4) == 'doc:') {
+                            eval('object.' + source.substring(source.length, 4) + '= str;');
+                        } else {
+                            eval('object.model.pending.data.' + indicatorModel.defaultModel.setId() + '.' + source + '= str;');
+                        }
+                        ruleResponse.ruleStatus = 'RULE_COMPLETE';
+                        if (index == configDoc.rules.length - 1) {
+                            def_processRules.resolve(ruleResponse);
+                        } else {
+                            processAllRules(index + 1,scope, object, indicatorModel, configDoc, ruleResponse, def_processRules);
+                        }
+                        break;
+                    case 'initialise':
+                        break;
+                    case 'unique':
+                        break;
+                }
+
+            } else {
+                //TODO: implement server side post actions   
+
+                object.model.pending.processingStatus.seq = seq;
+                object.model.pending.processingStatus.ruleStatus = PROCESSING_STATUS_SERVER_RULES;
+                ruleResponse.ruleStatus = 'RULE_SERVER';
+                def_processRules.resolve(ruleResponse);
+
+            }
+        } else {
+            processAllRules(index + 1,scope, object, indicatorModel, configDoc, ruleResponse, def_processRules);
+        }
+
+
+        return def_processRules;
+    };
+
+
+
 
 GK.prototype.unlock = function(val) {
     var self = this;
