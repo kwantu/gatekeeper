@@ -1,5 +1,10 @@
 'use strict';
 
+/*require('./lib/config');
+require('./lib/library');
+require('./lib/betterdata.dao');*/
+
+
 /** 
  * Represents the gatekeeper module.
  * This module will hold all functions to access gatekeeper vi GK() object
@@ -15,24 +20,22 @@
  * @return {Object} new GK constructor / class object
  *
  */
-function GK(){
-	//
-	var _this = this;
+function GK() {
+    //
+    var _this = this;
 }
 
-var getResponse = function(status, name, message, error, model,approvedModel, rejectedModel){
+var getResponse = function(status, name, message, error, model) {
 
-        var response = {
-                            status: status,
-                            name: name,
-                            message: message,
-                            error: error,
-                            model: model,
-                            approvedModel:approvedModel,
-                            rejectedModel:rejectedModel
-                    }
-        return  response
-    
+    var response = {
+        status: status,
+        name: name,
+        message: message,
+        error: error,
+        model: model
+    }
+    return response
+
 }
 
 /** 
@@ -43,7 +46,7 @@ var getResponse = function(status, name, message, error, model,approvedModel, re
  * @param {string} documentId - document id which needs to be initialised
  * @param {string} instanceType - valued can be (newInstance/newSequence)
  * @param {string} setId - setId
- * @param {string} profileId - profileId
+ * @param {number} profileId - profileId
  * @param {string} validDate - validDate
  
  * @author Hasan Abbas
@@ -53,112 +56,134 @@ var getResponse = function(status, name, message, error, model,approvedModel, re
  * var gatekeeper = new GK();
  * gatekeeer.instantiate('abc161','newSequence','developerDetail',22,'22/04/2016');
  *
- * @return {Object} Promise Object with respose Object
+ * @return {Array} Array containing document ,approved and rejected objects.
  *
  */
 
-GK.prototype.instantiate = function(documentId, instanceType, setId, profileId, validDate){
-    
-    var self = this;
-    var def = new $.Deferred();
+GK.prototype.instantiate = function(documentId, instanceType, setId, profileId, validDate) {
 
-    if(instanceType == INSTANCE_TYPE_NEW_INS){
+    var _this = this;
+    return new Promise(function(resolve, reject) {
+        try {
 
-        dao.get(documentId).done(
-            function(data){ 
-                
-                var response = getResponse(CONFLICT_CODE, CONFLICT_NAME,'Document with same id already exists',true,null,null,null )
-                    
-                def.reject(response);
+            if (instanceType == INSTANCE_TYPE_NEW_INS) {
 
-            }).fail(function(err){
+                dao.get(documentId).done(
+                    function(data) {
 
-                library.saveEntries(setId, profileId, documentId, validDate).done(function(data){
+                        var response = getResponse(CONFLICT_CODE, CONFLICT_NAME, 'Document with same id already exists.', true, null);
 
+                        var responseArray = [response];
 
-                    // Taken from old serviceImpl : TODO: review
+                        reject(responseArray);
 
-                    if(setId == PROFILE_SET_ID)
-                    {
-                        service.createProfileDocuments(LOCAL_SETTINGS.COMMUNITY_CONFIG.communityId, documentId);
-                    }
-                    else{
-                        service.addToLocalRegistry({"uuid":documentId,"setId":setId,"applicationId":app.SCOPE.applicationId, "profileId":app.SCOPE.profileId}); 
-                    }
-
-                    def.resolve(data);
-
-                }).fail(function(err){
-
-                    def.reject(err);
-                    
-                });
-
-            });
-
-    } else if(instanceType == INSTANCE_TYPE_NEW_SEQ) {
-
-         dao.get(documentId).done(
-            function(data){
-                
-               if(data.model.pending.status == ENTRY_STATUS_AUTHORISED || data.model.pending.status == ENTRY_STATUS_REJECTED) {
-
-                    var saveNewSeq = function(newSeq){
-                       data.model.pending.seq = newSeq;
-                       data.model.pending.data = {};
-                       data.model.pending.status = ENTRY_STATUS_INITIALISED;
-                       data.model.pending.validDate = validDate;
-                       data.model.pending.revision = '';
-                       var user= {"name": LOCAL_SETTINGS.SESSION.firstName + " " + LOCAL_SETTINGS.SESSION.lastName,"userId": LOCAL_SETTINGS.SUBSCRIPTIONS.userId, "username": LOCAL_SETTINGS.SUBSCRIPTIONS.username};
-                      
-                       data.model.pending.user = user;
-                       dao.save(data).done(
-                            function(s){
-                               // console.log(data);
-                                def.resolve(data);
+                    }).fail(function(err) {
+                       
+                       library.saveEntries(setId, profileId, documentId, validDate).then(
+                        function(data){
+                           /* // Taken from old serviceImpl : TODO: review
+                            if(setId == PROFILE_SET_ID)
+                            {
+                                service.createProfileDocuments(LOCAL_SETTINGS.COMMUNITY_CONFIG.communityId, documentId);
                             }
-                        ).fail(function(err){
-                            def.reject(err);
+                            else{
+                                service.addToLocalRegistry({"uuid":documentId,"setId":setId,"applicationId":app.SCOPE.applicationId, "profileId":app.SCOPE.profileId}); 
+                            }*/
+                            
+                            resolve(data);
+
+                        }, function(err){
+                            
+                            reject(err);
+                            
                         });
 
-                    };
-                    
-                    var approve_doc_id = documentId+':approved'
-                    dao.get(approve_doc_id).done(function(data){
-                        var seq = JSON.xpath("max(//approved/seq)",ko.toJS(data),{})[0];
-                        var new_seq = seq + 1;
-                        saveNewSeq(new_seq);
 
-                    }).fail(function(err){
-                       
-                        def.reject(err);
+
                     });
 
-               } else {
+            } else if (instanceType == INSTANCE_TYPE_NEW_SEQ) {
 
-                    var response = getResponse(SERVER_ERROR_CODE, SERVER_ERROR_NAME,
-                            'Cannot create sequence.Current status should be'+ ENTRY_STATUS_AUTHORISED + 'or '+ ENTRY_STATUS_REJECTED, true, null, null, null );
-                    def.resolve(response);
-               }
+                dao.get(documentId).done(
+                    function(data) {
 
-            }).fail(function(err){
-                //create document relating to new seq
-                library.saveEntries(setId, profileId, documentId, validDate).done(function(data){
-                    def.resolve(data);
-                }).fail(function(err){
-                    var response = getResponse(err.status, err.name,
-                        err.message, true, null, null, null); 
-                    def.resolve(response);
-                });
-            });
-    } else {
+                        if (data.model.pending.status == ENTRY_STATUS_AUTHORISED || data.model.pending.status == ENTRY_STATUS_REJECTED) {
 
-        console.log('instance type not found');            
-    
-    }
+                            var saveNewSeq = function(newSeq) {
+                                console.log('newSeq==' + newSeq);
+                                data.model.pending.seq = newSeq;
+                                data.model.pending.data = {};
+                                data.model.pending.status = ENTRY_STATUS_INITIALISED;
+                                data.model.pending.validDate = validDate;
+                                data.model.pending.revision = '';
+                                var user = {
+                                    "name": LOCAL_SETTINGS.SESSION.firstName + " " + LOCAL_SETTINGS.SESSION.lastName,
+                                    "userId": LOCAL_SETTINGS.SUBSCRIPTIONS.userId,
+                                    "username": LOCAL_SETTINGS.SUBSCRIPTIONS.username
+                                };
+                                data.model.pending.user = user;
 
-    return def;
+
+                            };
+
+                            var approve_doc_id = documentId + ':approved'
+                            dao.get(approve_doc_id).done(function(approvedData) {
+                                var seq = JSON.xpath("max(//approved/seq)", ko.toJS(approvedData), {})[0];
+                                var new_seq = seq + 1;
+                                saveNewSeq(new_seq);
+
+                                var mainRes = getResponse(CREATED_CODE, CREATED_NAME, 'Sequence created', false, data);
+                                var responseArray = [mainRes];
+                                resolve(responseArray);
+
+                            }).fail(function(err) {
+
+
+                                var mainRes = getResponse(err.status, err.name, 'Approved doc not found to create a new sequence', true, null);
+
+                                var responseArray = [mainRes];
+
+                                reject(responseArray);
+
+                            });
+
+                        } else {
+
+                            var response = getResponse(SERVER_ERROR_CODE, SERVER_ERROR_NAME,
+                                'Cannot create sequence. Current status should be ' + ENTRY_STATUS_AUTHORISED + ' or ' + ENTRY_STATUS_REJECTED, true, null);
+                            var responseArray = [response];
+                            reject(responseArray);
+                        }
+
+                    }).fail(function(err) {
+                        //create document relating to new seq
+                        library.saveEntries(setId, profileId, documentId, validDate).then(
+                            function(data) {
+                                resolve(data);
+                            }, 
+                            function(err) {
+                                var response = getResponse(err.status, err.name, err.message, true, null);
+                                var responseArray = [response];
+                                reject(responseArray);
+                            });
+                        });
+
+            } else {
+                var response = getResponse(SERVER_ERROR_CODE, SERVER_ERROR_NAME, 'Instance parameter not passed', true, null);
+                var responseArray = [response];
+                reject(responseArray);
+            }
+        } catch (err) {
+            console.log('catch case '+err);
+            reject(err);
+
+        }
+    });
+
+
 };
+
+
 
 /** 
  * Represents the instantiateData function.
@@ -178,133 +203,146 @@ GK.prototype.instantiate = function(documentId, instanceType, setId, profileId, 
  * var gatekeeper = new GK();
  * gatekeeer.instantiateData('abc161','newSequence','fromAuthorised',viewModel,1)
  *
- * @return {Object} Promise Object with respose Object
+ * @return {Array} Array containing document object.
  *
  */
-GK.prototype.instantiateData = function(documentId, instantiateFrom, indicatorModel, seqNo){
+GK.prototype.instantiateData = function(documentId, instantiateFrom, indicatorModel, seqNo) {
 
     //from : 1 - input
     //from : 2 - definition
     //from : 3 - authorised
+    var _this = this;
+    return new Promise(function(resolve, reject) {
+        try {
 
-    var self = this;
-    var def = new $.Deferred();
+            var getResponse = function(status, name, message, error, model) {
 
-    var getResponse = function(status, name, message, error, model,approvedModel, rejectedModel){
+                var response = {
+                    status: status,
+                    name: name,
+                    message: message,
+                    error: error,
+                    model: model
+                }
+                return response;
+            }
 
-        var response = {
-                            status: status,
-                            name: name,
-                            message: message,
-                            error: error,
-                            model: model,
-                            approvedModel:approvedModel,
-                            rejectedModel:rejectedModel
-                    }
-        return  response
-    }
+            dao.get(documentId).done(
+                function(data) {
 
-    var savePacket = function(data){
-                        dao.save(data).done(
-                            function(s){
-                             
-                                def.resolve(s);
+                    if (data.model.pending.status == ENTRY_STATUS_INITIALISED) {
+
+                        if (data.model.pending.seq == seqNo) {
+
+                            if (instantiateFrom == FROM_REQUEST) {
+
+                                dao.get(documentId).done(function(data) {
+
+                                    data.model.pending.data[indicatorModel.defaultModel.setId()] = JSON.parse(ko.toJSON(eval('indicatorModel.customModel.' + indicatorModel.defaultModel.setId()), function(key, value) {
+                                        if (key === '__ko_mapping__') {
+                                            return;
+                                        } else if (value == undefined) {
+                                            return '';
+                                        } else {
+                                            return value;
+                                        }
+                                    }));
+
+                                    data.model.pending.status = ENTRY_STATUS_DATA_INITIALISED;
+                                    var response = getResponse(UPDATED_CODE, UPDATED_NAME, 'Document initialised.', false, data);
+                                    var responseArray = [response];
+                                    resolve(responseArray);
+
+                                }).fail(function(err) {
+
+                                    var response = getResponse(err.status, err.name, 'Cannot find document ' + documentId, true, null);
+                                    var responseArray = [response];
+                                    reject(responseArray);
+
+                                });
+
+                            } else if (instantiateFrom == FROM_DEFINITION) {
+
+                                dao.get(documentId).done(function(data) {
+
+                                    var setId = indicatorModel.defaultModel.setId();
+                                    var version = JSON.xpath("/indicators[setId eq '" + setId + "']/version", app.SCOPE.APP_CONFIG, {});
+                                    var setModelId = setId + '_' + version + '_ENTRY';
+                                    dao.get(setModelId).done(function(setModel) {
+
+                                        var definitionModel = eval('setModel.model.pending.data.' + setId);
+                                        data.model.pending.data[setId] = definitionModel;
+                                        data.model.pending.status = ENTRY_STATUS_DATA_INITIALISED;
+
+                                        var response = getResponse(UPDATED_CODE, UPDATED_NAME, 'Document initialised.', false, data);
+                                        var responseArray = [response];
+                                        resolve(responseArray);
+
+
+
+                                    }).fail(function(err) {
+
+                                        var response = getResponse(err.status, err.name, 'Cannot find default model ' + setModelId, true, null);
+                                        var responseArray = [response];
+                                        reject(responseArray);
+
+                                    });
+
+
+                                }).fail(function(err) {
+
+                                    var response = getResponse(err.status, err.name, 'Cannot find document ' + documentId, true, null);
+                                    var responseArray = [response];
+                                    reject(responseArray);
+
+                                });
+
+                            } else if (instantiateFrom == FROM_AUTHORISED) {
+
+                                dao.get(documentId).done(function(data) {
+
+                                    var setId = indicatorModel.defaultModel.setId();
+                                    var version = JSON.xpath("/indicators[setId eq '" + setId + "']/version", app.SCOPE.APP_CONFIG, {});
+                                    var approvedModelId = documentId + ':approved';
+                                    dao.get(approvedModelId).done(function(approvedModel) {
+                                        var max_seq = JSON.xpath('max(/model/approved/seq)', approvedModel, {})[0];
+                                        var lastApprovedModel = JSON.xpath('/model/approved[./seq = ' + max_seq + ']', approvedModel, {})[0];
+
+                                        var newModel = eval('lastApprovedModel.data.' + setId);
+                                        data.model.pending.data[setId] = newModel;
+                                        data.model.pending.status = ENTRY_STATUS_DATA_INITIALISED;
+
+                                        var response = getResponse(UPDATED_CODE, UPDATED_NAME, 'Document initialised.', false, data);
+                                        var responseArray = [response];
+                                        resolve(responseArray);
+
+                                    }).fail(function(err) {
+
+                                        var response = getResponse(err.status, err.name, 'Cannot find approved model ' + approvedModelId, true, null);
+                                        var responseArray = [response];
+                                        reject(responseArray);
+
+                                    });
+
+
+                                }).fail(function(err) {
+
+                                    var response = getResponse(err.status, err.name, 'Cannot find document ' + documentId, true, null);
+                                    var responseArray = [response];
+                                    reject(responseArray);
+
+                                });
+
+
                             }
-                        ).fail(function(err){
-                            def.reject(err);
-                        });
-                    };
 
-    dao.get(documentId).done(
-            function(data){
+                        } else {
 
-                if(data.model.pending.status == ENTRY_STATUS_INITIALISED){
+                            var response = getResponse(SERVER_ERROR_CODE, SERVER_ERROR_NAME,
+                                'Input sequence should be equal to pending sequence.', true, null);
+                            var responseArray = [response];
+                            reject(responseArray);
 
-                    if(data.model.pending.seq == seqNo){
-
-                        if(instantiateFrom == FROM_REQUEST){
-
-                            dao.get(documentId).done(function(data){
-                                
-                                data.model.pending.data[indicatorModel.defaultModel.setId()] = JSON.parse(ko.toJSON(eval('indicatorModel.customModel.'+indicatorModel.defaultModel.setId()), function(key, value) {
-                                    if(key === '__ko_mapping__') {
-                                        return;
-                                    } else if (value == undefined) {
-                                        return '';
-                                    } else {
-                                        return value;
-                                    } 
-                                }));
-                                data.model.pending.status = ENTRY_STATUS_DATA_INITIALISED;
-                                savePacket(data);
-                                var response = getResponse(UPDATED_CODE, UPDATED_NAME,
-                                   'Document initialised', false, data, null, null )
-                                def.resolve(response);
-
-                               
-
-                            }).fail(function(err){
-
-                                def.reject(err);
-
-                            });
-
-                        } else if(instantiateFrom == FROM_DEFINITION){
-
-                            dao.get(documentId).done(function(data){
-                                
-                                var setId = indicatorModel.defaultModel.setId();
-                                var version =  JSON.xpath("/indicators[setId eq '"+ setId +"']/version",app.SCOPE.APP_CONFIG,{});
-                                var setModelId= setId+'_'+version+'_ENTRY';
-                                dao.get(setModelId).done(function(setModel){
-
-                                    var definitionModel = eval('setModel.model.pending.data.'+setId);
-                                    data.model.pending.data[setId] = definitionModel;
-                                    data.model.pending.status = ENTRY_STATUS_DATA_INITIALISED;
-                                    savePacket(data);
-                                    var response = getResponse(UPDATED_CODE, UPDATED_NAME,
-                                        'Document initialised', false, data, null, null )
-                                    def.resolve(response);
-
-                                }).fail();
-
-                                
-                            }).fail(function(err){
-
-                                def.reject(err);
-
-                            });
-
-                        } else if(instantiateFrom == FROM_AUTHORISED){
-
-                            dao.get(documentId).done(function(data){
-                                
-                                var setId = indicatorModel.defaultModel.setId();
-                                var version =  JSON.xpath("/indicators[setId eq '"+ setId +"']/version",app.SCOPE.APP_CONFIG,{});
-                                var approvedModelId= documentId+':approved';
-                                dao.get(approvedModelId).done(function(approvedModel){
-                                    var max_seq =  JSON.xpath('max(/model/approved/seq)',approvedModel,{})[0];
-                                    var lastApprovedModel = JSON.xpath('/model/approved[./seq = '+ max_seq +']',approvedModel,{})[0]    ;
-                                    
-                                   
-
-                               
-                                    var newModel =  eval('lastApprovedModel.data.'+setId);
-                                    data.model.pending.data[setId] = newModel;
-                                    data.model.pending.status = ENTRY_STATUS_DATA_INITIALISED;
-                                    savePacket(data);
-                                    var response = getResponse(UPDATED_CODE, UPDATED_NAME,
-                                        'Document initialised', false, data, null, null )
-                                    def.resolve(response);
-
-                                }).fail();
-
-                                
-                            }).fail(function(err){
-
-                                def.reject(err);
-
-                            });
 
 
                         }
@@ -312,29 +350,29 @@ GK.prototype.instantiateData = function(documentId, instantiateFrom, indicatorMo
                     } else {
 
                         var response = getResponse(SERVER_ERROR_CODE, SERVER_ERROR_NAME,
-                            'Input sequence should be equal to pending sequence.', true, null, null, null );
-                        def.resolve(response);
+                            'Status is not in ' + ENTRY_STATUS_INITIALISED + ' state.', true, null);
+                        var responseArray = [response];
+                        reject(responseArray);
+
+
+
 
                     }
-                    
-                } else {
 
-                        var response = getResponse(SERVER_ERROR_CODE, SERVER_ERROR_NAME,
-                            'Status is not in '+ ENTRY_STATUS_INITIALISED+ ' state.', true, null, null, null );
-                        def.resolve(response);
+                }).fail(function(err) {
 
-                }
-
-            }).fail(function(err){
-
-                var response = getResponse(err.status, err.name, err.message, true, null, null, null); 
-                def.resolve(response);
+                var response = getResponse(err.status, err.name, err.message, true, null);
+                var responseArray = [response];
+                reject(responseArray);
 
             });
 
+        } catch (err) {
 
+            reject(err);
 
-    return def;
+        }
+    });
 
 };
 
@@ -355,307 +393,219 @@ GK.prototype.instantiateData = function(documentId, instantiateFrom, indicatorMo
  * var gatekeeper = new GK();
  * gatekeeer.update('abc161',viewModel)
  *
- * @return {Object} Promise Object with respose Object
+  * @return {Array} Array containing document object.
  *
  */
 
-GK.prototype.update = function(documentId,indicatorModel){
-    
+GK.prototype.update = function(documentId, indicatorModel) {
+
     var self = this;
-    var def = new $.Deferred();
+    return new Promise(function(resolve, reject) {
+        try {
 
-    var processAllRules = 
-        function(index, documentId, indicatorModel, configDoc, ruleResponse, def_processRules){
+            
+            dao.get(documentId).done(function(doc) {
 
-            var ruleObj = configDoc.rules[index];   
-            var executeAt = ruleObj.executeAt;
-            var id = ruleObj.id;
-            var seq = ruleObj.seq;
-            var type = ruleObj.executeRule.ruleType;
+                if (indicatorModel.modelErrors().length > 0) {
 
-            if(executeAt == 'local'){
+                    var response = getResponse(PRECONDITION_FAILED_CODE, PRECONDITION_FAILED_NAME,
+                        'There are ' + indicatorModel.modelErrors().length + ' errors on form. Please resolve first.', true, null);
+                    var responseArray = [response];
+                    reject(responseArray);
 
-                    switch (type) {
-                        case 'update': 
-                            var source = ruleObj.executeRule.params.source;
-                            var str = '';
-                            for(var ol=0; ol<ruleObj.executeRule.params.target.length; ol++){
+                } else {
 
-                                var targetItem = ruleObj.executeRule.params.target[ol];
-                                var targetType = targetItem.type;
-                                var targetName = targetItem.name;
-                                if(targetType == 'variable'){
-                                   
-                                    str  = str + eval("indicatorModel.customModel."+indicatorModel.defaultModel.setId()+'.'+ targetName+'()')+ ' ';
+                    if (doc.model.pending.status == ENTRY_STATUS_DATA_INITIALISED || doc.model.pending.status == ENTRY_STATUS_UPDATED) {
 
-                                } else {
-
-                                    str  = str + targetName + ' ';
-                                }
-
+                        var model = JSON.parse(ko.toJSON(eval('indicatorModel.customModel.' + indicatorModel.defaultModel.setId()), function(key, value) {
+                            if (key === '__ko_mapping__') {
+                                return;
+                            } else if (value == undefined) {
+                                return '';
+                            } else {
+                                return value;
                             }
-                            dao.get(documentId).done(function(object){
-                                 
-                                if(source.substring(0, 4) == 'doc:'){
-                                    eval('object.'+ source.substring(source.length, 4) +'= str;');
-                                } else {
-                                    eval('object.model.pending.data.'+indicatorModel.defaultModel.setId()+'.'+source+'= str;');
-                                }
-                                
-                                dao.save(object).done(function(data){
-                                 
-                                    ruleResponse.ruleStatus = 'RULE_COMPLETE';
-                                    
-                                    if(index == configDoc.rules.length - 1){
-                                      def_processRules.resolve(ruleResponse);
-                                    } else {
-                                        processAllRules(index+1, documentId, indicatorModel, configDoc, ruleResponse,def_processRules);    
-                                    }
+                        }));
 
-                                }).fail(function(err){
-                                  ruleResponse.ruleStatus = 'RULE_ERROR';
-                                });
+                        var version = '';
 
-                            }).fail(function(err){
-
-                                
-
-                            });
-                           
-                            break;
-                        case 'initialise':
-                            break;
-                        case 'unique':
-                            break;
-                    }
-
-            } else {
-                //TODO: implement server side post actions   
-                
-                dao.get(documentId).done(function(data){
-                    data.model.pending.processingStatus.seq = seq;
-                    data.model.pending.processingStatus.ruleStatus = PROCESSING_STATUS_SERVER_RULES;
-                    dao.save(data).done(function(object){
-                         
-                         ruleResponse.ruleStatus = 'RULE_SERVER';
-                         def_processRules.resolve(ruleResponse);
-
-                    }).fail(function(err){
-                         console.log('error function in PROCESSING_STATUS_SERVER_RULES'+ err);
-                    });
-                }).fail(function(){
-                     
-                });
-            }
-            return def_processRules;
-    }
-
-    dao.get(documentId).done(function(doc){
-                
-        if(indicatorModel.modelErrors().length > 0){
-
-            var response = getResponse(PRECONDITION_FAILED_CODE, PRECONDITION_FAILED_NAME,
-                    'There are '+indicatorModel.modelErrors().length+ ' errors on form. Please resolve first.', true, null, null, null );
-            def.reject(response);
-
-        } else {
-
-            if(doc.model.pending.status == ENTRY_STATUS_DATA_INITIALISED || doc.model.pending.status == ENTRY_STATUS_UPDATED){
-
-
-                var model = JSON.parse(ko.toJSON(eval('indicatorModel.customModel.'+indicatorModel.defaultModel.setId()), function(key, value) {
-                    if(key === '__ko_mapping__') {
-                        return;
-                    } else if (value == undefined) {
-                        return '';
-                    } else {
-                        return value;
-                    } 
-                }));
-                
-                var version='';
-
-                if(indicatorModel.customModel.setId() == PROFILE_SET_ID)
-                { 
-                    version = 'V1.0';
-                }
-                else
-                { 
-                    version =  JSON.xpath("/indicators[setId eq '"+indicatorModel.customModel.setId()+"']/version",app.SCOPE.APP_CONFIG,{});
-                }
-
-                // Process all attachments
-                var files = JSON.xpath("//*[fileData and isChanged eq 'true']",model,{});
-                
-                var attachementsToProcess = [];
-                    for(var ol=0;ol<files.length;ol++){
-                        var filesObj=files[ol];   
-                        if(filesObj.mime == 'image/jpeg' || filesObj.mime == 'image/png')
-                        {
-                            
-                            attachementsToProcess.push({ "data": filesObj.fileData.substring(filesObj.fileData.indexOf('base64')+7), "id": filesObj.uuid , "mime": filesObj.mime });
-                        }   
-                        else{
-                            attachementsToProcess.push({ "data": filesObj.fileData, "id": filesObj.uuid , "mime": filesObj.mime }); 
-                        }                                  
-                        
-                        filesObj.fileData = "";
-                        filesObj.isChanged = 'false';
-                }
-
-                var allFiles = JSON.xpath("//*[fileData ne '' and uuid ne '']",model,{});
-                    for(var ol=0;ol<allFiles.length;ol++){
-                        allFiles[ol].fileData = "";
-                    }   
-
-                var saveAttachments = function(data, loop) {
-                            
-                    dao.saveAttachment(data.id, data.rev, attachementsToProcess[loop].data, 
-                        attachementsToProcess[loop].mime, attachementsToProcess[loop].id)
-                    .done(function(e) {
-                        
-                        if (attachementsToProcess.length > (loop + 1)) {
-                            saveAttachments(e, loop + 1);
+                        if (indicatorModel.customModel.setId() == PROFILE_SET_ID) {
+                            version = 'V1.0';
+                        } else {
+                            version = JSON.xpath("/indicators[setId eq '" + indicatorModel.customModel.setId() + "']/version", app.SCOPE.APP_CONFIG, {});
                         }
-                    }).fail(function (e) {
-                        console.log("can not saved attachemnt " + e);
-                    });
-                };
 
-                var postSave = function(data){
-                    indicatorModel.defaultModel.atomId(documentId);
-                    if (attachementsToProcess.length > 0) {
-                        saveAttachments(data, 0);
-                    }
-                    var response = getResponse(UPDATED_CODE, UPDATED_NAME,'Document updated', false, data, null, null )
-                    def.resolve(response);
-                };
-
-                var savePacket = function(finalPkt){
-
-                    //validate online here
-                    dao.save(finalPkt).done(postSave).fail(function(err){
-                        app.showMessage("Unable to save changes due to version conflict. Please reload the form to see the recent updates.");
-                        deffered.reject(err);
-                    });
-
-                };
-
-                dao.get(indicatorModel.customModel.setId()+ '_'+version+"_config").done(function(configDoc){
-
-                    doc.model.pending.data[indicatorModel.customModel.setId()] = model;
-
-                    //doc.model.pending.status = ENTRY_STATUS_PENDING;
-
-                    if(configDoc.moderation != undefined && configDoc.moderation.required == true)
-                    {
-                        doc.control.draft = true;
-                    }
-                    
-                    // Update the updated date field
-                    doc.updated = moment().format();
-                    // Update the contributors list
-                    doc.contributors.push({"name": LOCAL_SETTINGS.SESSION.firstName + " " + LOCAL_SETTINGS.SESSION.lastName,"userId": LOCAL_SETTINGS.SUBSCRIPTIONS.userId, "username": LOCAL_SETTINGS.SUBSCRIPTIONS.username});
-
-                    doc.model.pending.user = {"name": LOCAL_SETTINGS.SESSION.firstName + " " + LOCAL_SETTINGS.SESSION.lastName,"userId": LOCAL_SETTINGS.SUBSCRIPTIONS.userId, "username": LOCAL_SETTINGS.SUBSCRIPTIONS.username};
+                        // Process all attachments
+                        /*var files = JSON.xpath("//*[fileData and isChanged eq 'true']",model,{});
                         
-                    // Save the document in the database i.e. local PouchDB or Couchbase Lite
-                    doc.source = "remote";
+                        var attachementsToProcess = [];
+                            for(var ol=0;ol<files.length;ol++){
+                                var filesObj=files[ol];   
+                                if(filesObj.mime == 'image/jpeg' || filesObj.mime == 'image/png')
+                                {
+                                    
+                                    attachementsToProcess.push({ "data": filesObj.fileData.substring(filesObj.fileData.indexOf('base64')+7), "id": filesObj.uuid , "mime": filesObj.mime });
+                                }   
+                                else{
+                                    attachementsToProcess.push({ "data": filesObj.fileData, "id": filesObj.uuid , "mime": filesObj.mime }); 
+                                }                                  
+                                
+                                filesObj.fileData = "";
+                                filesObj.isChanged = 'false';
+                        }
 
-                    if(configDoc.rules.length > 0){
+                        var allFiles = JSON.xpath("//*[fileData ne '' and uuid ne '']",model,{});
+                            for(var ol=0;ol<allFiles.length;ol++){
+                                allFiles[ol].fileData = "";
+                            }   
 
-                        doc.model.pending.status = ENTRY_STATUS_PENDING_RULES;
-                        dao.save(doc).done(function(data){
+                        var saveAttachments = function(data, loop) {
+                                    
+                            dao.saveAttachment(data.id, data.rev, attachementsToProcess[loop].data, 
+                                attachementsToProcess[loop].mime, attachementsToProcess[loop].id)
+                            .done(function(e) {
+                                
+                                if (attachementsToProcess.length > (loop + 1)) {
+                                    saveAttachments(e, loop + 1);
+                                }
+                            }).fail(function (e) {
+                                console.log("can not saved attachemnt " + e);
+                            });
+                        };*/
 
-                            var def_processRules = new $.Deferred();
-                            processAllRules(0,documentId, indicatorModel, configDoc,{"ruleStatus":""},def_processRules).done(function(inModel){
+                        dao.get(indicatorModel.customModel.setId() + '_' + version + "_config").done(function(configDoc) {
 
-                                if(inModel.ruleStatus == 'RULE_COMPLETE'){
+                            doc.model.pending.data[indicatorModel.customModel.setId()] = model;
 
-                                    dao.get(documentId).done(function(data){
-                                        data.model.pending.processingStatus.seq = '';
-                                        data.model.pending.processingStatus.ruleStatus = '';
-                                        data.model.pending.status = ENTRY_STATUS_UPDATED;
+                            //doc.model.pending.status = ENTRY_STATUS_PENDING;
 
+                            if (configDoc.moderation != undefined && configDoc.moderation.required == true) {
+                                doc.control.draft = true;
+                            }
+
+                            // Update the updated date field
+                            doc.updated = moment().format();
+                            // Update the contributors list
+                            doc.contributors.push({
+                                "name": LOCAL_SETTINGS.SESSION.firstName + " " + LOCAL_SETTINGS.SESSION.lastName,
+                                "userId": LOCAL_SETTINGS.SUBSCRIPTIONS.userId,
+                                "username": LOCAL_SETTINGS.SUBSCRIPTIONS.username
+                            });
+
+                            doc.model.pending.user = {
+                                "name": LOCAL_SETTINGS.SESSION.firstName + " " + LOCAL_SETTINGS.SESSION.lastName,
+                                "userId": LOCAL_SETTINGS.SUBSCRIPTIONS.userId,
+                                "username": LOCAL_SETTINGS.SUBSCRIPTIONS.username
+                            };
+
+                            // Save the document in the database i.e. local PouchDB or Couchbase Lite
+                            doc.source = "remote";
+
+                            if (configDoc.rules != undefined && configDoc.rules.length > 0) {
+
+                                doc.model.pending.status = ENTRY_STATUS_PENDING_RULES;
+                                
+
+                                //Start rule processing here -------------------------
+                                var def_processRules = new $.Deferred();
+                                processAllRules(0, "update", doc, indicatorModel, configDoc, {
+                                    "ruleStatus": ""
+                                }, def_processRules).done(function(inModel) {
+
+                                    if (inModel.ruleStatus == 'RULE_COMPLETE') {
+
+                                        doc.model.pending.processingStatus.seq = '';
+                                        doc.model.pending.processingStatus.ruleStatus = '';
+                                        doc.model.pending.status = ENTRY_STATUS_UPDATED;
 
                                         //TODO: Fix ENTRY_STATUS_READY_TO_SUBMIT in document. 
-                                        if(app.processId != undefined)
-                                        {
-                                            var process = JSON.xpath("/processes[subProcessId eq '"+app.processId+"']",data,{});
-                                                                                
-                                            if(process.length > 0)
-                                            {
-                                                process[0].status = ENTRY_STATUS_READY_TO_SUBMIT;// check here the index
-                                            }   
+                                        if (app.processId != undefined) {
+                                            var process = JSON.xpath("/processes[subProcessId eq '" + app.processId + "']", doc, {});
+
+                                            if (process.length > 0) {
+                                                process[0].status = ENTRY_STATUS_READY_TO_SUBMIT; // check here the index
+                                            }
                                         }
                                         
 
-                                        savePacket(data);
 
-                                    }).fail(function(error){
-                                        def.reject('ENTRY_STATUS_UPDATED failed');
-                                    });
 
-                                } else if(inModel.ruleStatus == 'RULE_SERVER'){
-                                    
-                                    console.log('dependent onserver rule');
+                                        indicatorModel.defaultModel.atomId(documentId);
+                                        var response = getResponse(UPDATED_CODE, UPDATED_NAME, 'Document updated', false, doc);
+                                        var responseArray = [response];
+                                        resolve(responseArray);
 
-                                } else if(inModel.ruleStatus == 'RULE_ERROR'){
-                                    
-                                    console.log('rule error from somewhere');
+                                    } else if (inModel.ruleStatus == 'RULE_SERVER') {
 
-                                }
+                                        console.log('dependent onserver rule');
 
-                            }).fail(function(error){
-                                  def.reject('processAllRules fail promise case failed');
-                            });
+                                        var response = getResponse(UPDATED_CODE, UPDATED_NAME, 'dependent onserver rule', false, doc);
+                                        var responseArray = [response];
+                                        resolve(responseArray);
 
-                        }).fail(function(error){
-                            def.reject('ENTRY_STATUS_PENDING_RULES failed');
+
+                                    } else if (inModel.ruleStatus == 'RULE_ERROR') {
+
+                                        console.log('rule error from somewhere');
+
+                                    }
+
+                                }).fail(function(error) {
+                                    reject('processAllRules fail promise case failed');
+                                });
+
+                            } else {
+
+                                doc.model.pending.status = ENTRY_STATUS_UPDATED;
+                                indicatorModel.defaultModel.atomId(documentId);
+                                var response = getResponse(UPDATED_CODE, UPDATED_NAME, 'Document updated', false, doc);
+                                var responseArray = [response];
+                                resolve(responseArray);
+
+
+                            }
+
+                        }).fail(function(err) {
+
+                            var response = getResponse(err.status, err.name, 'config file not found.', true, null);
+                            var responseArray = [response];
+                            reject(responseArray);
+
                         });
 
-                    
-                        
+
+
+
                     } else {
 
-                        dao.get(documentId).done(function(data){
-                         
-                            data.model.pending.status = ENTRY_STATUS_UPDATED;
-                            savePacket(data);
+                        var response = getResponse(SERVER_ERROR_CODE, SERVER_ERROR_NAME,
+                            'Status is not in ' + ENTRY_STATUS_DATA_INITIALISED + ' or ' + ENTRY_STATUS_UPDATED + ' state.', true, null);
 
-                        }).fail(function(error){
-                            def.reject('ENTRY_STATUS_UPDATED failed');
-                        });
+                        var responseArray = [response];
+                        reject(responseArray);
+
+
 
                     }
+                }
 
-                }).fail(function(err){
+            }).fail(function(err) {
 
-                    var response = getResponse(err.status, err.name, err.message, true, null, null, null); 
-                    def.reject(response);       
+                var response = getResponse(err.status, err.name, err.message, true, null);
+                var responseArray = [response];
+                reject(responseArray);
 
-                });
-                   
 
-                
-            
-            } else {
+            });
 
-                var response = getResponse(SERVER_ERROR_CODE, SERVER_ERROR_NAME,
-                            'Status is not in '+ ENTRY_STATUS_DATA_INITIALISED +' or '+ ENTRY_STATUS_UPDATED + ' state.', true, null, null, null );
-                def.resolve(response);
-
-            }
+        } catch (err) {
+            reject(err);
         }
-
-    }).fail(function(err){
-
-            var response = getResponse(err.status, err.name, err.message, true, null, null, null); 
-            def.reject(response);
     });
 
-    return def;
-    };
+
+
+};
 
 /** 
  * Represents the authorise  function.
@@ -671,80 +621,51 @@ GK.prototype.update = function(documentId,indicatorModel){
  * var gatekeeper = new GK();
  * gatekeeer.authorise('abc161')
  *
- * @return {Object} Promise Object with respose Object
+  * @return {Array} Array containing document and authorise object.
  *
  */
 
-GK.prototype.authorise = function(documentId){
-    var self = this;
-    var def = new $.Deferred();
-    if(documentId != null &&  documentId != undefined && documentId != ''){
+GK.prototype.authorise = function(documentId) {
 
-        dao.get(documentId).done(function(data){
-
-
-            if(data.model.pending.status == ENTRY_STATUS_UPDATED){
-
-                var saveDoc = function(doc){
-                       dao.save(doc).done(
-                            function(s){
-                              
-                              
-                            }
-                        ).fail(function(err){
-                            def.reject(err);
+    var _this = this;
+    return new Promise(function(resolve, reject) {
+        try {
+            if (documentId != null && documentId != undefined && documentId != '') {
+                dao.get(documentId).done(function(data) {
+                    if (data.model.pending.status == ENTRY_STATUS_UPDATED) {
+                        var setId = data.category.term;
+                        var path = data.model.pending;
+                        var item = eval(path);
+                        data.model.pending.status = ENTRY_STATUS_AUTHORISED;
+                        var approve_doc_id = documentId + ':approved';
+                        dao.get(approve_doc_id).done(function(approveData) {
+                            approveData.model.approved.push(item);
+                            var mainRes = getResponse(UPDATED_CODE, UPDATED_NAME, 'Document Model approved', false, data);
+                            var approveRes = getResponse(UPDATED_CODE, UPDATED_NAME, 'Approved model incremented', false, approveData);
+                            var responseArray = [mainRes, approveRes];
+                            resolve(responseArray);
+                        }).fail(function(err) {
+                            console.log(err);
                         });
-                };
-
-
-                var setId = data.category.term;
-                var path = data.model.pending;
-                var item = eval(path);
-                data.model.pending.status = ENTRY_STATUS_AUTHORISED;
-                saveDoc(data);
-
-                var approve_doc_id = documentId+':approved';
-
-                dao.get(approve_doc_id).done(function(approveData){
-                    
-                    approveData.model.approved.push(item);
-                    saveDoc(approveData);
-
-
-                    def.resolve(approveData);
-                 
-                }).fail(function(err){
-                   
-                    console.log(err);
+                    } else {
+                        var response = getResponse(BAD_REQUEST_CODE, BAD_REQUEST_NAME, 'Status not in updated state', true, null);
+                        var responseArray = [response];
+                        reject(responseArray);
+                   }
+                }).fail(function(err) {
+                    var response = getResponse(err.status, err.name, err.message, true, null);
+                    var responseArray = [response];
+                    reject(responseArray);
                 });
-
             } else {
-
-                var response = getResponse(BAD_REQUEST_CODE, BAD_REQUEST_NAME,'Status not in updated state',true,null,null,null )
-                def.reject(response);
-
+                var response = getResponse(BAD_REQUEST_CODE, BAD_REQUEST_NAME, 'Document ID is blank', true, null);
+                var responseArray = [response];
+                reject(responseArray);
             }
-
-            
-
-        }).fail(function(err){
-
-           var response = getResponse(err.status, err.name,
-                        err.message, true, null, null, null); 
-            def.resolve(response);
-
-        });
-
-    }else{
-
-        var response = getResponse(BAD_REQUEST_CODE, BAD_REQUEST_NAME,'Document ID is blank',true,null,null,null )
-                    
-        def.reject(response);
-
-    }
-
-    return def;
-   
+        } catch (err) {
+            reject(err);
+        }
+    });
 };
 
 /** 
@@ -761,100 +682,188 @@ GK.prototype.authorise = function(documentId){
  * var gatekeeper = new GK();
  * gatekeeer.reject('abc161')
  *
- * @return {Object} Promise Object with respose Object
+ * @return {Array} Array containing document and rejected object.
  *
  */
 
-GK.prototype.reject = function(documentId){
-    
-    var self = this;
-    var def = new $.Deferred();
-    if(documentId != null &&  documentId != undefined && documentId != ''){
+GK.prototype.reject = function(documentId) {
 
-        
+    var _this = this;
 
-        dao.get(documentId).done(function(data){
+    return new Promise(function(resolve, reject) {
+        try {
+            
+            if (documentId != null && documentId != undefined && documentId != '') {
 
-            if(data.model.pending.status == ENTRY_STATUS_UPDATED){
+                dao.get(documentId).done(function(data) {
 
-                var saveDoc = function(doc){
-                       dao.save(doc).done(
-                            function(s){
-                               
-                              
-                            }
-                        ).fail(function(err){
-                            def.reject(err);
+                    if (data.model.pending.status == ENTRY_STATUS_UPDATED) {
+                        var setId = data.category.term;
+                        var item = eval('data.model.pending.data' + setId);
+                        data.model.pending.status = ENTRY_STATUS_REJECTED;
+                        var rejected_doc_id = documentId + ':rejected';
+                        dao.get(rejected_doc_id).done(function(rejectedData) {
+                            rejectedData.model.rejected.push(item);
+                            var mainRes = getResponse(UPDATED_CODE, UPDATED_NAME, 'Document Model approved', false, data);
+                            var rejRes = getResponse(UPDATED_CODE, UPDATED_NAME, 'Rejetced model incremented', false, rejectedData);
+                            var responseArray = [mainRes, rejRes];
+                            resolve(responseArray);
+
+                        }).fail(function(err) {
+
+                            console.log(err);
                         });
-                };
 
+                    } else {
 
-                var setId = data.category.term;
-                var item = eval('data.model.pending.data'+setId);
+                        var response = getResponse(BAD_REQUEST_CODE, BAD_REQUEST_NAME, 'Status not in updated state', true, null);
+                        var responseArray = [response];
+                        reject(responseArray);
+                    }
+                }).fail(function(err) {
 
-                data.model.pending.status = ENTRY_STATUS_REJECTED;
-                saveDoc(data);
+                    var response = getResponse(err.status, err.name, err.message, true, null);
+                    var responseArray = [response];
+                    reject(responseArray);
 
-                var rejected_doc_id = documentId+':rejected';
-
-                dao.get(rejected_doc_id).done(function(rejectedData){
-                    
-                    rejectedData.model.rejected.push(item);
-                    saveDoc(rejectedData);
-
-
-                    def.resolve(rejectedData);
-                    
-                }).fail(function(err){
-                   
-                    console.log(err);
                 });
 
             } else {
 
-                var response = getResponse(BAD_REQUEST_CODE, BAD_REQUEST_NAME,'Status not in updated state',true,null,null,null )
-                def.reject(response);
+                var response = getResponse(BAD_REQUEST_CODE, BAD_REQUEST_NAME, 'Document ID is blank', true, null)
+                var responseArray = [response];
+                reject(responseArray);
 
             }
 
-            
+        } catch (err) {
+            reject(err);
+        }
+    });
 
-        }).fail(function(err){
 
-           var response = getResponse(err.status, err.name,
-                        err.message, true, null, null, null); 
-            def.resolve(response);
 
-        });
-
-    }else{
-
-        var response = getResponse(BAD_REQUEST_CODE, BAD_REQUEST_NAME,'Document ID is blank',true,null,null,null )
-                    
-        def.reject(response);
-
-    }
-
-    return def;
 
 };
 
-var processInitialiseRule = function(documentId, ruleObj, indicatorModel){
-    
-};
-
-var processUniqueRule = function(documentId, ruleObj, indicatorModel){
+var processInitialiseRule = function(documentId, ruleObj, indicatorModel) {
 
 };
 
-GK.prototype.unlock = function(val){
+var processUniqueRule = function(documentId, ruleObj, indicatorModel) {
+
+};
+
+var processAllRules =
+    function(index, scope, object, indicatorModel, configDoc, ruleResponse, def_processRules) {
+
+        var ruleObj = configDoc.rules[index];
+        var executeAt = ruleObj.executeAt;
+        var event = ruleObj.event;
+        var id = ruleObj.id;
+        var seq = ruleObj.seq;
+        var type = ruleObj.executeRule.ruleType;
+
+        if(scope == event){
+            if (executeAt == 'local') {
+
+                switch (type) {
+                    case 'update':
+                        var source = ruleObj.executeRule.params.source;
+                        var str = '';
+                        for (var ol = 0; ol < ruleObj.executeRule.params.target.length; ol++) {
+
+                            var targetItem = ruleObj.executeRule.params.target[ol];
+                            var targetType = targetItem.type;
+                            var targetName = targetItem.name;
+                            if (targetType == 'variable') {
+
+                                str = str + eval("indicatorModel.customModel." + indicatorModel.defaultModel.setId() + '.' + targetName + '()') + ' ';
+
+                            } else {
+
+                                str = str + targetName + ' ';
+                            }
+
+                        }
+                        //-------------------
+                        if (source.substring(0, 4) == 'doc:') {
+                            eval('object.' + source.substring(source.length, 4) + '= str;');
+                        } else {
+                            eval('object.model.pending.data.' + indicatorModel.defaultModel.setId() + '.' + source + '= str;');
+                        }
+                        ruleResponse.ruleStatus = 'RULE_COMPLETE';
+                        if (index == configDoc.rules.length - 1) {
+                            def_processRules.resolve(ruleResponse);
+                        } else {
+                            processAllRules(index + 1,scope, object, indicatorModel, configDoc, ruleResponse, def_processRules);
+                        }
+                        break;
+                    case 'initialise':
+                        break;
+                    case 'unique':
+                        break;
+                }
+
+            } else {
+                //TODO: implement server side post actions   
+
+                object.model.pending.processingStatus.seq = seq;
+                object.model.pending.processingStatus.ruleStatus = PROCESSING_STATUS_SERVER_RULES;
+                ruleResponse.ruleStatus = 'RULE_SERVER';
+                def_processRules.resolve(ruleResponse);
+
+            }
+        } else {
+            processAllRules(index + 1,scope, object, indicatorModel, configDoc, ruleResponse, def_processRules);
+        }
+
+
+        return def_processRules;
+    };
+
+
+
+
+GK.prototype.unlock = function(val) {
     var self = this;
     // Use the native Promise constructor
     return new Promise(function(resolve, reject) {
-    
-      
+
+
 
     });
 };
 
-module.exports = GK;
+GK.prototype.persist = function(modelArray) {
+    var self = this;
+
+    return new Promise(function(resolve, reject) {
+        try {
+
+            for (var i = 0; i < modelArray.length; i++) {
+                dao.save(modelArray[i].model).done(function(data) {
+                    console.log(data);
+                    resolve(data);
+                }).fail(function(err) {
+                    console.log(err);
+                    reject(err);
+                });
+            }
+        } catch (err) {
+            reject(err);
+        }
+    });
+};
+
+
+module.exports = {
+
+    instantiate: instantiate,
+    instantiateData: instantiateData,
+    update: update,
+    authorise: authorise,
+    reject: reject,
+    unlock: unlock
+
+}
