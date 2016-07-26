@@ -857,4 +857,13 @@ GK.prototype.persist = function(modelArray) {
 };
 
 
-module.exports = GK;
+module.exports = {
+
+    instantiate: instantiate,
+    instantiateData: instantiateData,
+    update: update,
+    authorise: authorise,
+    reject: reject,
+    unlock: unlock
+
+}
