@@ -7,7 +7,7 @@
     "test": "test"
   },
   "scripts": {
-    "browserify": "browserify -g uglifyify index.js --standalone GK > dist/gatekeeper.min.js -d",
+    "browserify": "browserify index.js --standalone GK > dist/gatekeeper.js -d",
     "docs": "jsdoc2md 'index.js' > docs/index.md",
     "test": "make test && mocha-phantomjs test/client/runner.html",
     "build": "npm run browserify && npm run docs && npm test"
