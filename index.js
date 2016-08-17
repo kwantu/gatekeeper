@@ -398,7 +398,7 @@ GK.prototype.instantiateData = function(documentId, instantiateFrom, indicatorMo
                                         data.model.pending.data[setId] = newModel;
                                         data.model.pending.status = ENTRY_STATUS_DATA_INITIALISED;
 
-                                        var response = getResponse(UPDATED_CODE, UPDATED_NAME, 'Document initialised.', false, data);
+                                        
                                         var response = {
                                             status:UPDATED_CODE,
                                             name: UPDATED_NAME,
@@ -541,8 +541,13 @@ GK.prototype.update = function(documentId, indicatorModel, processId, subProcess
 
                 if (indicatorModel.modelErrors().length > 0) {
 
-                    var response = getResponse(PRECONDITION_FAILED_CODE, PRECONDITION_FAILED_NAME,
-                        'There are ' + indicatorModel.modelErrors().length + ' errors on form. Please resolve first.', true, null);
+                    var response = {
+                        status: PRECONDITION_FAILED_CODE,
+                        name: PRECONDITION_FAILED_NAME,
+                        message: 'There are ' + indicatorModel.modelErrors().length + ' errors on form. Please resolve first.',
+                        error: true,
+                        model: null
+                    };
                     var responseArray = [response];
                     reject(responseArray);
 
@@ -692,7 +697,15 @@ GK.prototype.update = function(documentId, indicatorModel, processId, subProcess
 
 
                                         indicatorModel.defaultModel.atomId(documentId);
-                                        var response = getResponse(UPDATED_CODE, UPDATED_NAME, 'Document updated', false, doc);
+                                        
+                                        var response = {
+                                            status: UPDATED_CODE,
+                                            name: UPDATED_NAME,
+                                            message: 'Document updated',
+                                            error: false,
+                                            model: doc
+                                        };
+
                                         var responseArray = [response];
                                         resolve(responseArray);
 
@@ -700,7 +713,15 @@ GK.prototype.update = function(documentId, indicatorModel, processId, subProcess
 
                                         //console.log('dependent onserver rule');
 
-                                        var response = getResponse(UPDATED_CODE, UPDATED_NAME, 'dependent onserver rule', false, doc);
+                                        
+                                        var response = {
+                                            status: UPDATED_CODE,
+                                            name: UPDATED_NAME,
+                                            message: 'dependent onserver rule',
+                                            error: false,
+                                            model: doc
+                                        };
+
                                         var responseArray = [response];
                                         resolve(responseArray);
 
@@ -784,7 +805,14 @@ GK.prototype.update = function(documentId, indicatorModel, processId, subProcess
 
                         }).fail(function(err) {
 
-                            var response = getResponse(err.status, err.name, 'config file not found.', true, null);
+                            
+                            var response = {
+                                status: err.status,
+                                name: err.name,
+                                message: 'config file not found.',
+                                error: true,
+                                model: null
+                            };
                             var responseArray = [response];
                             reject(responseArray);
 
@@ -793,11 +821,15 @@ GK.prototype.update = function(documentId, indicatorModel, processId, subProcess
 
 
 
-                    } else {
+                    } else {    
 
-                        var response = getResponse(SERVER_ERROR_CODE, SERVER_ERROR_NAME,
-                            'Status is not in ' + ENTRY_STATUS_DATA_INITIALISED + ' or ' + ENTRY_STATUS_UPDATED + ' state.', true, null);
-
+                        var response = {
+                            status: SERVER_ERROR_CODE,
+                            name: SERVER_ERROR_NAME,
+                            message: 'Status is not in ' + ENTRY_STATUS_DATA_INITIALISED + ' or ' + ENTRY_STATUS_UPDATED + ' state.',
+                            error: true,
+                            model: null
+                        };
                         var responseArray = [response];
                         reject(responseArray);
 
@@ -808,7 +840,15 @@ GK.prototype.update = function(documentId, indicatorModel, processId, subProcess
 
             }).fail(function(err) {
 
-                var response = getResponse(err.status, err.name, err.message, true, null);
+                
+                var response = {
+                    status: err.status,
+                    name: err.name,
+                    message: err.message,
+                    error: true,
+                    model: null
+                };
+
                 var responseArray = [response];
                 reject(responseArray);
 
