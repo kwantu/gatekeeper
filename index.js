@@ -565,6 +565,11 @@ GK.prototype.update = function(documentId, indicatorModel, processId, subProcess
                             }
                         }));
 
+                        var allFiles = JSON.xpath("//*[fileData ne '' and uuid ne '']",model,{});
+                        for(var ol=0;ol<allFiles.length;ol++){
+                            allFiles[ol].fileData = "";
+                        }
+
                         var version = '';
 
                         if (indicatorModel.customModel.setId() == PROFILE_SET_ID) {
