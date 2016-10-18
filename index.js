@@ -572,11 +572,13 @@ GK.prototype.update = function(documentId, indicatorModel, processId, subProcess
 
                         var version = '';
 
-                        if (indicatorModel.customModel.setId() == PROFILE_SET_ID) {
+                        version = JSON.xpath("/indicators[setId eq '" + indicatorModel.customModel.setId() + "']/version", app.SCOPE.APP_CONFIG, {});
+                        
+                        /*if (indicatorModel.customModel.setId() == PROFILE_SET_ID) {
                             version = 'V1.0';
                         } else {
                             version = JSON.xpath("/indicators[setId eq '" + indicatorModel.customModel.setId() + "']/version", app.SCOPE.APP_CONFIG, {});
-                        }
+                        }*/
 
                         // Process all attachments
                         /*var files = JSON.xpath("//*[fileData and isChanged eq 'true']",model,{});
